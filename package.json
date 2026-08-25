@@ -1,0 +1,19 @@
+{
+  "name": "zombie-land-survival",
+  "version": "2.0.0",
+  "description": "Open World 3D Zombie Survival Game built with Babylon.js",
+  "main": "js/main.js",
+  "scripts": {
+    "test": "node tests/game.test.js",
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "babylonjs",
+    "webgl",
+    "zombie-survival",
+    "game-dev",
+    "3d"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
+}

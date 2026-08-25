@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d1b12">
+<title>Zombie Land — Open World Survival</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="gameCanvas" touch-action="none"></canvas>
+
+<div id="loadingScreen">
+  <div class="loadBox">
+    <div class="loadTitle">ZOMBIE LAND</div>
+    <div class="loadSubtitle">OPEN WORLD SURVIVAL</div>
+    <div class="spinner"></div>
+    <div class="loadBarTrack"><div class="loadBarFill" id="loadProgress"></div></div>
+    <div class="loadStatus" id="loadStatus">Generating Open World & Survivor Houses...</div>
+    <div class="loadTip">💡 TIP: Zombies cannot open closed doors. Use houses to shelter, reload, and scavenge medkits!</div>
+  </div>
+</div>
+
+<div id="vignette"></div>
+
+<div id="hud">
+  <div id="hpWrap"><div id="hpLabel">HP</div><div id="hpBar"><div id="hpFill"></div></div></div>
+  <div id="killsWrap"><span class="kTitle">KILLS</span><span id="killsVal">0</span></div>
+  <div id="wpnLabel">PISTOL</div>
+</div>
+
+<div id="crosshair">
+  <span class="ch t"></span><span class="ch b"></span><span class="ch l"></span><span class="ch r"></span><span class="ch dot"></span>
+</div>
+
+<div id="msg"></div>
+<div id="subMsg"></div>
+<div id="climbHint">PRESS [W] OR [SPACE] TO CLIMB LADDER</div>
+<div id="doorHint">PRESS [E] TO OPEN / CLOSE DOOR</div>
+<div id="resumeHint">CLICK TO RESUME</div>
+
+<div id="deathOverlay">
+  <div class="bigRed">YOU DIED</div>
+  <div id="respawnText">Respawning in 3...</div>
+</div>
+
+<div id="startOverlay">
+  <h1>ZOMBIE LAND</h1>
+  <p class="tagline">The city is lost. Nature took it back.<br>Every house is enterable — close doors to keep them out.<br>Only a HEADSHOT puts them down.</p>
+  <p class="startHint" id="startHint">CLICK TO ENTER THE CITY</p>
+</div>
+
+<div id="mobileUI">
+  <div id="joy"><div id="joyKnob"></div></div>
+  <div id="btnFire" class="mbtn big">FIRE</div>
+  <div id="btnJump" class="mbtn">JUMP</div>
+  <div id="btnDoor" class="mbtn">DOOR</div>
+  <div id="btnSwap" class="mbtn">SWAP</div>
+</div>
+
+<script src="js/babylon.js"></script>
+<script>
+  if (typeof BABYLON === 'undefined') {
+    document.write('<script src="https://cdn.jsdelivr.net/npm/babylonjs@6.37.1/babylon.js"><\\/script>');
+  }
+</script>
+<script>
+  if (typeof BABYLON === 'undefined') {
+    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.37.1/babylon.js"><\\/script>');
+  }
+</script>
+<script src="js/config.js"></script>
+<script src="js/world.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
