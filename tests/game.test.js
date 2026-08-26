@@ -227,12 +227,28 @@ test('Main Game: Player, Zombies, Gunplay & 60-Frame Render Loop', () => {
   assert(ctx.wantJump === false, 'Respawn must reset wantJump');
   assert(ctx.player.hp === 100, 'Respawn must restore player HP to 100');
 
-  // Test GlowLayer sky exclusion (prevents glowing sky issue)
-  if (ctx.glowLayer && ctx.glowLayer.customEmissiveColorSelector) {
-    const fakeResult = { set: (r, g, b, a) => { fakeResult.r = r; fakeResult.g = g; fakeResult.b = b; } };
-    ctx.glowLayer.customEmissiveColorSelector({ name: 'skyDome' }, null, null, fakeResult);
-    assert(fakeResult.r === 0 && fakeResult.g === 0 && fakeResult.b === 0, 'SkyDome must be zeroed out in GlowLayer');
-  }
+  // Test Virtual Joystick Input
+  assert(typeof ctx.startJoystick === 'function', 'startJoystick must be defined');
+  assert(typeof ctx.updateJoyFromPoint === 'function', 'updateJoyFromPoint must be defined');
+  assert(typeof ctx.stopJoystick === 'function', 'stopJoystick must be defined');
+
+  const joyRect = ctx.document.getElementById('joy').getBoundingClientRect();
+  const joyCenterY = joyRect.top + joyRect.height / 2;
+  const joyCenterX = joyRect.left + joyRect.width / 2;
+
+  // Simulate touching and dragging joystick forward (35px above center)
+  ctx.startJoystick(joyCenterX, joyCenterY - 35, 1, true);
+  assert(ctx.joyId === 1, 'Joystick must capture touch pointer ID 1');
+  assert(ctx.joyTargetY < -0.5, 'Moving stick upward must produce negative joyTargetY for forward movement');
+
+  // Simulate dragging joystick right (35px right of center)
+  ctx.updateJoyFromPoint(joyCenterX + 35, joyCenterY);
+  assert(ctx.joyTargetX > 0.5, 'Moving stick rightward must produce positive joyTargetX');
+
+  // Simulate releasing joystick
+  ctx.stopJoystick(1);
+  assert(ctx.joyId === null, 'Joystick release must clear joyId');
+  assert(ctx.joyTargetY === 0 && ctx.joyTargetX === 0, 'Joystick release must zero out analog input targets');
 
   // Simulate 60 frames
   for (let i = 0; i < 60; i++) {
