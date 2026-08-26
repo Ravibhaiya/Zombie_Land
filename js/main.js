@@ -1587,7 +1587,7 @@ if (typeof MODEL_LOADER !== 'undefined' && MODEL_LOADER.preloadAll) {
 }
 
 bindInput();
-elWpn.textContent = WPN.pistol.label;
+if (elWpn) elWpn.textContent = WPN.pistol.label;
 
 var _frameCount = 0;
 engine.runRenderLoop(function () {

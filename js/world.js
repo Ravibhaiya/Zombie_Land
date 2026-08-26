@@ -1009,12 +1009,12 @@ function nearRoad(x, z) {
   return false;
 }
 
-var WALL_PAL = ['#cdb89a', '#bfc6ae', '#a9bcc4', '#c9a9a2', '#b8b0a2', '#cfc39f', '#aeb4bf', '#c4b8a0'];
-var ROOF_PAL = ['#8b8b93', '#7d7666', '#6d7a80'];
-var HOUSE_WALLS = ['#f2d8ac', '#ead9d2', '#cfe3d6', '#f2cfae', '#e6d9ef', '#d8e8c8'];
-var HOUSE_ROOFS = ['#c94f4f', '#b85c3f', '#7a6ea8', '#4f8a8b', '#c98a3f'];
-var CAR_COLORS = ['#b5533c', '#4f7f9f', '#8a8f96', '#5f8f5a', '#c9a03f', '#7a4f8a', '#a8a29a'];
-var LEAF_GREENS = ['#4f9f3f', '#5fb04a', '#3f8f37', '#6fbf55'];
+var WALL_PAL = ['#fed7aa', '#bae6fd', '#bbf7d0', '#fecdd3', '#fef08a', '#e9d5ff', '#ddd6fe', '#fbcfe8'];
+var ROOF_PAL = ['#ea580c', '#2563eb', '#dc2626', '#059669', '#d97706', '#8b5cf6'];
+var HOUSE_WALLS = ['#fed7aa', '#bae6fd', '#bbf7d0', '#fecdd3', '#fef08a', '#e9d5ff', '#ddd6fe', '#fbcfe8'];
+var HOUSE_ROOFS = ['#f97316', '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
+var CAR_COLORS = ['#ef4444', '#3b82f6', '#eab308', '#10b981', '#a855f7', '#f97316', '#06b6d4'];
+var LEAF_GREENS = ['#4ade80', '#22c55e', '#86efac', '#16a34a', '#a3e635'];
 
 var waterMats = [];
 var ringMats = [];
@@ -1048,63 +1048,63 @@ function makeProcTexture(size, fn) {
 
 function buildGroundAndRoads() {
   var ground = BABYLON.MeshBuilder.CreateGround('g', { width: 700, height: 700, subdivisions: GFX_MOBILE ? 1 : 4 }, scene);
-  var grassMat = mat('#77c94f');
-  grassMat.specularColor = new BABYLON.Color3(0.04, 0.05, 0.03);
-  grassMat.specularPower = 16;
+  var grassMat = mat('#52c41a');
+  grassMat.specularColor = new BABYLON.Color3(0.08, 0.12, 0.06);
+  grassMat.specularPower = 32;
   var grassTex = makeProcTexture(GFX_MOBILE ? 128 : 256, function (x, y, size) {
     var n = Math.sin(x * 0.19) * Math.cos(y * 0.17) + Math.sin((x * 3.1 + y * 2.4) * 0.09) * 0.55;
     n += ((x * 13 + y * 7) % 11) / 11 * 0.4;
     var t = 0.5 + 0.5 * Math.sin(n * 1.4);
-    var blade = ((x * 31 + y * 17) % 5) === 0 ? 18 : 0;
-    return [68 + t * 58 + blade, 118 + t * 86, 38 + t * 32];
+    var blade = ((x * 31 + y * 17) % 5) === 0 ? 25 : 0;
+    return [78 + t * 65 + blade, 196 + t * 45, 42 + t * 32];
   });
   if (grassTex) {
     grassMat.diffuseTexture = grassTex;
-    grassTex.uScale = 42;
-    grassTex.vScale = 42;
+    grassTex.uScale = 36;
+    grassTex.vScale = 36;
   }
   ground.material = grassMat;
   ground.receiveShadows = true;
   ground.freezeWorldMatrix();
 
   var patchList = [];
-  var patchCols = ['#63b23f', '#8ad46a', '#5aa838', '#6fbf49'];
-  for (var i = 0; i < 60; i++) {
-    var a = sr(0, Math.PI * 2), r = sr(40, 330);
-    patchList.push(discR(sr(6, 22), Math.cos(a) * r, Math.sin(a) * r, 0.012, patchCols[i % 4], 18));
+  var patchCols = ['#73d13d', '#95de64', '#ff7875', '#ffd666', '#b37feb', '#5cdbd3', '#69c0ff'];
+  for (var i = 0; i < 75; i++) {
+    var a = sr(0, Math.PI * 2), r = sr(35, 330);
+    patchList.push(discR(sr(4, 18), Math.cos(a) * r, Math.sin(a) * r, 0.012, patchCols[i % patchCols.length], 18));
   }
   for (var mh = 0; mh < 14; mh++) {
     var rc = ROADS[Math.floor(srnd() * 4)];
     var along = sr(-220, 220);
-    if (srnd() > 0.5) patchList.push(discR(0.7, along, rc, 0.058, '#3a3a40', 14));
-    else patchList.push(discR(0.7, rc, along, 0.052, '#3a3a40', 14));
+    if (srnd() > 0.5) patchList.push(discR(0.75, along, rc, 0.058, '#262f3d', 14));
+    else patchList.push(discR(0.75, rc, along, 0.052, '#262f3d', 14));
   }
   mergePainted(patchList);
 
   var roadV = [], roadH = [], sideParts = [], dashParts = [];
   ROADS.forEach(function (c) {
-    roadV.push(box(ROAD_W, 0.04, 640, c, 0.02, 0, '#4a4a52'));
-    roadH.push(box(640, 0.04, ROAD_W, 0, 0.032, c, '#4a4a52'));
+    roadV.push(box(ROAD_W, 0.04, 640, c, 0.02, 0, '#334155'));
+    roadH.push(box(640, 0.04, ROAD_W, 0, 0.032, c, '#334155'));
     var gaps = [-320];
     ROADS.forEach(function (rc2) { gaps.push(rc2 - 9, rc2 + 9); });
     gaps.push(320);
     for (var g = 0; g < gaps.length; g += 2) {
       var z0 = gaps[g], z1 = gaps[g + 1];
       if (z1 - z0 < 4) continue;
-      sideParts.push(box(3, 0.14, z1 - z0, c + (ROAD_W / 2 + 1.5), 0.07, (z0 + z1) / 2, '#b9b3a4'));
-      sideParts.push(box(3, 0.14, z1 - z0, c - (ROAD_W / 2 + 1.5), 0.07, (z0 + z1) / 2, '#b9b3a4'));
-      sideParts.push(box(z1 - z0, 0.14, 3, (z0 + z1) / 2, 0.075, c + (ROAD_W / 2 + 1.5), '#b9b3a4'));
-      sideParts.push(box(z1 - z0, 0.14, 3, (z0 + z1) / 2, 0.075, c - (ROAD_W / 2 + 1.5), '#b9b3a4'));
+      sideParts.push(box(3, 0.14, z1 - z0, c + (ROAD_W / 2 + 1.5), 0.07, (z0 + z1) / 2, '#e2e8f0'));
+      sideParts.push(box(3, 0.14, z1 - z0, c - (ROAD_W / 2 + 1.5), 0.07, (z0 + z1) / 2, '#e2e8f0'));
+      sideParts.push(box(z1 - z0, 0.14, 3, (z0 + z1) / 2, 0.075, c + (ROAD_W / 2 + 1.5), '#e2e8f0'));
+      sideParts.push(box(z1 - z0, 0.14, 3, (z0 + z1) / 2, 0.075, c - (ROAD_W / 2 + 1.5), '#e2e8f0'));
     }
     for (var z = -300; z <= 300; z += 4.6) {
       var nearH = false;
       ROADS.forEach(function (rc3) { if (Math.abs(z - rc3) < ROAD_W / 2 + 6) nearH = true; });
-      if (!nearH) dashParts.push(box(0.35, 0.012, 2.2, c, 0.046, z, '#f7d34e'));
+      if (!nearH) dashParts.push(box(0.38, 0.012, 2.2, c, 0.046, z, '#facc15'));
     }
     for (var x = -300; x <= 300; x += 4.6) {
       var nearV = false;
       ROADS.forEach(function (rc4) { if (Math.abs(x - rc4) < ROAD_W / 2 + 6) nearV = true; });
-      if (!nearV) dashParts.push(box(2.2, 0.012, 0.35, x, 0.052, c, '#f7d34e'));
+      if (!nearV) dashParts.push(box(2.2, 0.012, 0.38, x, 0.052, c, '#facc15'));
     }
   });
   ROADS.forEach(function (ix) {
@@ -1112,8 +1112,8 @@ function buildGroundAndRoads() {
       if (Math.abs(ix) > 100 || Math.abs(iz) > 100) return;
       [1, -1].forEach(function (sgn) {
         for (var b = -2; b <= 2; b++) {
-          dashParts.push(box(ROAD_W, 0.012, 1.1, ix, 0.056, iz + sgn * (ROAD_W / 2 + 4.5) + b * 2.2, '#dedede'));
-          dashParts.push(box(1.1, 0.012, ROAD_W, ix + sgn * (ROAD_W / 2 + 4.5) + b * 2.2, 0.056, iz, '#dedede'));
+          dashParts.push(box(ROAD_W, 0.012, 1.1, ix, 0.056, iz + sgn * (ROAD_W / 2 + 4.5) + b * 2.2, '#ffffff'));
+          dashParts.push(box(1.1, 0.012, ROAD_W, ix + sgn * (ROAD_W / 2 + 4.5) + b * 2.2, 0.056, iz, '#ffffff'));
         }
       });
     });
@@ -1133,17 +1133,22 @@ function addWindows(parts, parent, w, d, h) {
     for (var ci = 0; ci < cols; ci++) {
       var fx = -w / 2 + (ci + 0.5) * (w / cols);
       if (srnd() < 0.18) continue;
-      parts.push(box(ww, wh, 0.1, fx, y, d / 2 + 0.03, '#22303a', parent));
+      parts.push(box(ww + 0.12, wh + 0.12, 0.08, fx, y, d / 2 + 0.02, '#ffffff', parent));
+      parts.push(box(ww, wh, 0.1, fx, y, d / 2 + 0.04, '#38bdf8', parent));
       if (srnd() < 0.22) {
-        parts.push(box(ww + 0.15, 0.16, 0.12, fx, y + 0.25, d / 2 + 0.06, '#8a6b4a', parent, sr(-0.3, 0.3)));
-        parts.push(box(ww + 0.15, 0.16, 0.12, fx, y + 0.8, d / 2 + 0.06, '#8a6b4a', parent, sr(-0.3, 0.3)));
+        parts.push(box(ww + 0.18, 0.16, 0.12, fx, y + 0.25, d / 2 + 0.06, '#ea580c', parent, sr(-0.2, 0.2)));
+        parts.push(box(ww + 0.18, 0.16, 0.12, fx, y + 0.8, d / 2 + 0.06, '#ea580c', parent, sr(-0.2, 0.2)));
       }
-      if (srnd() < 0.5) parts.push(box(ww, wh, 0.1, fx, y, -d / 2 - 0.03, '#1d2a33', parent));
+      if (srnd() < 0.5) {
+        parts.push(box(ww + 0.12, wh + 0.12, 0.08, fx, y, -d / 2 - 0.02, '#ffffff', parent));
+        parts.push(box(ww, wh, 0.1, fx, y, -d / 2 - 0.04, '#38bdf8', parent));
+      }
     }
     for (var si = 0; si < 2; si++) {
       var fz = -d / 2 + (si + 0.5) * (d / 2);
       if (srnd() < 0.4) continue;
-      parts.push(box(0.1, wh, ww, w / 2 + 0.03, y, fz, '#22303a', parent));
+      parts.push(box(0.08, wh + 0.12, ww + 0.12, w / 2 + 0.02, y, fz, '#ffffff', parent));
+      parts.push(box(0.1, wh, ww, w / 2 + 0.04, y, fz, '#38bdf8', parent));
     }
   }
 }
@@ -1538,25 +1543,25 @@ function buildVehicle(x, z, ry, type) {
   if (type === 2) { L = 8.4; W = 2.4; H = 2.1; }
   parts.push(box(W, H, L, 0, 0.55 + H / 2, 0, colHex, root));
   if (type === 2) {
-    parts.push(box(W + 0.05, 0.85, L * 0.75, 0, 2.5, -L * 0.06, '#22303a', root));
+    parts.push(box(W + 0.05, 0.85, L * 0.75, 0, 2.5, -L * 0.06, '#38bdf8', root));
   } else {
     var cabL = L * 0.45;
     var cabZ = type === 3 ? L * 0.18 : -L * 0.05;
     parts.push(box(W - 0.15, 0.85, cabL, 0, 0.55 + H + 0.32, cabZ, colHex, root));
-    parts.push(box(W - 0.3, 0.62, cabL - 0.3, 0, 0.55 + H + 0.36, cabZ, '#26424f', root));
+    parts.push(box(W - 0.3, 0.62, cabL - 0.3, 0, 0.55 + H + 0.36, cabZ, '#38bdf8', root));
     if (type === 3) parts.push(box(W - 0.2, 0.5, L * 0.42, 0, 1, -L * 0.24, colHex, root));
   }
   [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (wl) {
-    var wheel = cyl(0.72, 0.72, 0.3, wl[0] * (W / 2 - 0.05), 0.42, wl[1] * L * 0.32, '#26262b', root, 12);
+    var wheel = cyl(0.72, 0.72, 0.3, wl[0] * (W / 2 - 0.05), 0.42, wl[1] * L * 0.32, '#1e293b', root, 12);
     wheel.rotation.z = Math.PI / 2;
     parts.push(wheel);
   });
-  parts.push(box(W, 0.28, 0.3, 0, 0.55, L / 2 + 0.02, '#9a9a9f', root));
-  parts.push(box(W, 0.28, 0.3, 0, 0.55, -L / 2 - 0.02, '#9a9a9f', root));
-  parts.push(box(0.4, 0.22, 0.1, W / 4, 0.78, L / 2 + 0.12, '#ffe9a8', root));
-  parts.push(box(0.4, 0.22, 0.1, -W / 4, 0.78, L / 2 + 0.12, '#ffe9a8', root));
-  parts.push(box(0.4, 0.22, 0.1, W / 4, 0.78, -L / 2 - 0.12, '#c94f3f', root));
-  parts.push(box(0.4, 0.22, 0.1, -W / 4, 0.78, -L / 2 - 0.12, '#c94f3f', root));
+  parts.push(box(W, 0.28, 0.3, 0, 0.55, L / 2 + 0.02, '#e2e8f0', root));
+  parts.push(box(W, 0.28, 0.3, 0, 0.55, -L / 2 - 0.02, '#e2e8f0', root));
+  parts.push(box(0.4, 0.22, 0.1, W / 4, 0.78, L / 2 + 0.12, '#fef08a', root));
+  parts.push(box(0.4, 0.22, 0.1, -W / 4, 0.78, L / 2 + 0.12, '#fef08a', root));
+  parts.push(box(0.4, 0.22, 0.1, W / 4, 0.78, -L / 2 - 0.12, '#ef4444', root));
+  parts.push(box(0.4, 0.22, 0.1, -W / 4, 0.78, -L / 2 - 0.12, '#ef4444', root));
   if (srnd() < 0.8) parts.push(box(sr(0.5, 1.1), sr(0.4, 0.7), 0.06, sr(-W / 3, W / 3), sr(0.7, 0.55 + H), W / 2 + 0.02, '#7d5a3f', root));
   var merged = BABYLON.Mesh.MergeMeshes(parts, true, true, null, false, false);
   if (merged) {
@@ -1582,28 +1587,36 @@ function buildTreeMasters() {
     m.isVisible = false;
     return m;
   }
+  // 1. Cartoon Fluffy Oak Tree (Cloud Canopy)
   var t1 = finish([
-    cyl(0.5, 0.38, 2.6, 0, 1.3, 0, '#7a5230'),
-    sph(3.4, 0, 3.7, 0, LEAF_GREENS[0], null, 9),
-    sph(2.2, 1.1, 4.6, 0.5, LEAF_GREENS[1], null, 8),
-    sph(1.9, -1, 4.4, -0.5, LEAF_GREENS[2], null, 8),
-    box(0.09, 1.3, 0.09, 1.5, 3.1, 0.3, '#4e8f3a'),
-    box(0.09, 1.1, 0.09, -1.3, 3.0, -0.4, '#4e8f3a')
+    cyl(0.55, 0.42, 2.8, 0, 1.4, 0, '#854d0e'),
+    sph(3.6, 0, 4.0, 0, '#22c55e', null, 8),
+    sph(2.8, 1.3, 4.8, 0.6, '#4ade80', null, 7),
+    sph(2.6, -1.2, 4.6, -0.6, '#16a34a', null, 7),
+    sph(2.2, 0, 5.5, 0, '#86efac', null, 7),
+    sph(2.0, -0.7, 3.4, 1.2, '#15803d', null, 6),
+    sph(2.0, 0.8, 3.2, -1.0, '#15803d', null, 6)
   ]);
+  // 2. Cartoon Stylized Pine Tree (Tiered Cones)
   var t2 = finish([
-    cyl(0.42, 0.3, 1.9, 0, 0.95, 0, '#7a5230'),
-    cyl(2.6, 0.1, 2.6, 0, 2.9, 0, '#3f7f45', null, 9),
-    cyl(2, 0.1, 2.1, 0, 4.3, 0, '#4f9f55', null, 9),
-    cyl(1.4, 0.1, 1.7, 0, 5.5, 0, '#3f8f4b', null, 9)
+    cyl(0.45, 0.35, 2.0, 0, 1.0, 0, '#78350f'),
+    cyl(3.2, 0.2, 2.4, 0, 3.0, 0, '#15803d', null, 8),
+    cyl(2.5, 0.15, 2.0, 0, 4.4, 0, '#16a34a', null, 8),
+    cyl(1.8, 0.1, 1.6, 0, 5.6, 0, '#22c55e', null, 8),
+    cyl(1.1, 0.05, 1.2, 0, 6.5, 0, '#4ade80', null, 8)
   ]);
+  // 3. Giant Stylized Apple / Willow Tree
   var t3 = finish([
-    cyl(0.85, 0.6, 3.4, 0, 1.7, 0, '#6b4a2c'),
-    sph(4.8, 0, 5.2, 0, '#4f9f3f', null, 10),
-    sph(3, 1.7, 6.3, 0.8, '#5fb04a', null, 8),
-    sph(2.6, -1.6, 6.1, -0.7, '#3f8f37', null, 8),
-    sph(2.2, 0.4, 6.9, -1.2, '#6fbf55', null, 8),
-    box(0.1, 1.6, 0.1, 2.1, 4.6, 0.6, '#4e8f3a'),
-    box(0.1, 1.3, 0.1, -1.9, 4.4, -0.9, '#4e8f3a')
+    cyl(0.9, 0.65, 3.6, 0, 1.8, 0, '#854d0e'),
+    sph(5.2, 0, 5.6, 0, '#22c55e', null, 8),
+    sph(3.4, 1.8, 6.8, 1.0, '#4ade80', null, 7),
+    sph(3.2, -1.8, 6.5, -0.9, '#16a34a', null, 7),
+    sph(2.8, 0.5, 7.6, -1.3, '#86efac', null, 7),
+    sph(2.6, -0.8, 7.4, 1.2, '#a3e635', null, 7),
+    sph(0.4, 1.5, 5.2, 1.2, '#ef4444', null, 5),
+    sph(0.4, -1.4, 4.9, -1.1, '#ef4444', null, 5),
+    sph(0.4, 0.3, 6.1, 2.1, '#ef4444', null, 5),
+    sph(0.4, -1.8, 5.8, 0.8, '#ef4444', null, 5)
   ]);
   return [t1, t2, t3];
 }
