@@ -16,9 +16,95 @@ var CONFIG = {
     ROADS: [-150, -50, 50, 150],
     SAFE_RADIUS: 11,
     SAFE_HOUSE_GRID: [-190, -100, 0, 100, 190],
-    CLEAR_COLOR: [0.52, 0.77, 0.93, 1],
-    FOG_COLOR: [0.74, 0.87, 0.95],
-    FOG_DENSITY: 0.0022
+    CLEAR_COLOR: [0.03, 0.06, 0.05, 1], // Pitch midnight horror sky
+    FOG_COLOR: [0.04, 0.08, 0.06],      // Deep ominous green-black mist
+    FOG_DENSITY: 0.0038
+  },
+
+  // Dynamic Day / Night Cycle Engine
+  DAY_NIGHT: {
+    ENABLED: true,
+    CYCLE_DURATION_MINUTES: 10,
+    INITIAL_HOUR: 7.0,
+    PROFILES: {
+      morning: {
+        label: 'MORNING',
+        icon: '🌅',
+        startHour: 5.5,
+        clearColor: [0.62, 0.48, 0.42, 1],
+        fogColor: [0.68, 0.58, 0.52],
+        fogDensity: 0.0018,
+        sunDir: [-0.75, -0.45, 0.35],
+        sunColor: [1.0, 0.82, 0.60],
+        sunIntensity: 0.96,
+        hemiDiffuse: [0.65, 0.62, 0.58],
+        hemiGround: [0.38, 0.36, 0.32],
+        hemiIntensity: 0.58,
+        lanternIntensity: 0.25,
+        flashlightActive: false,
+        exposure: 1.06
+      },
+      noon: {
+        label: 'NOON',
+        icon: '☀️',
+        startHour: 10.0,
+        clearColor: [0.45, 0.70, 0.90, 1],
+        fogColor: [0.65, 0.80, 0.92],
+        fogDensity: 0.0012,
+        sunDir: [-0.25, -0.92, 0.28],
+        sunColor: [1.0, 0.98, 0.92],
+        sunIntensity: 1.18,
+        hemiDiffuse: [0.82, 0.90, 0.88],
+        hemiGround: [0.42, 0.48, 0.40],
+        hemiIntensity: 0.78,
+        lanternIntensity: 0.0,
+        flashlightActive: false,
+        exposure: 1.14
+      },
+      dusk: {
+        label: 'DUSK',
+        icon: '🌇',
+        startHour: 17.5,
+        clearColor: [0.38, 0.20, 0.32, 1],
+        fogColor: [0.48, 0.26, 0.30],
+        fogDensity: 0.0022,
+        sunDir: [0.85, -0.32, -0.42],
+        sunColor: [0.98, 0.45, 0.22],
+        sunIntensity: 0.88,
+        hemiDiffuse: [0.38, 0.30, 0.36],
+        hemiGround: [0.22, 0.18, 0.20],
+        hemiIntensity: 0.48,
+        lanternIntensity: 0.85,
+        flashlightActive: true,
+        exposure: 0.96
+      },
+      night: {
+        label: 'MIDNIGHT',
+        icon: '🌑',
+        startHour: 21.0,
+        clearColor: [0.03, 0.06, 0.05, 1],
+        fogColor: [0.04, 0.08, 0.06],
+        fogDensity: 0.0032,
+        sunDir: [-0.45, -0.85, 0.35],
+        sunColor: [0.30, 0.42, 0.46],
+        sunIntensity: 0.52,
+        hemiDiffuse: [0.16, 0.24, 0.22],
+        hemiGround: [0.04, 0.06, 0.05],
+        hemiIntensity: 0.38,
+        lanternIntensity: 1.4,
+        flashlightActive: true,
+        exposure: 0.84
+      }
+    }
+  },
+
+  // Tactical Weapon Light / Flashlight
+  FLASHLIGHT: {
+    RANGE: 35.0,
+    ANGLE: 0.65,
+    EXPONENT: 2.5,
+    INTENSITY: 2.4,
+    COLOR: [1.0, 0.96, 0.85]
   },
 
   // Player Character & Movement Physics
@@ -31,7 +117,7 @@ var CONFIG = {
     RADIUS: 0.55,
     HEIGHT: 1.85,
     STEP_ASSIST_HEIGHT: 0.48, // Max obstacle height player automatically steps up
-    ACCELERATION_RATE: 12.0,
+    ACCELERATION_RATE: 14.0,
     KNOCKBACK_DAMPING: 6.0,
     HEALTH_REGEN_DELAY: 5.0,  // Seconds after damage before auto-regen kicks in
     HEALTH_REGEN_RATE: 9.0,   // HP per second
@@ -42,16 +128,18 @@ var CONFIG = {
   CAMERA: {
     MIN_Z: 0.2,
     MAX_Z: 1600,
-    BASE_FOV: 0.9,
+    BASE_FOV: 0.86,
     ADS_FOV_REDUCTION: 0.33,
-    SPRINT_FOV_BOOST: 0.06,
-    BASE_DISTANCE: 9.4,
-    ADS_DISTANCE: 6.8,
+    SPRINT_FOV_BOOST: 0.05,
+    BASE_DISTANCE: 9.0,
+    ADS_DISTANCE: 6.4,
     MIN_ALLOWED_DISTANCE: 1.4,
     COLLISION_PROBE_PADDING: 0.4,
     MOUSE_SENSITIVITY: 0.0024,
     ADS_SENSITIVITY_MULT: 0.55,
-    TOUCH_LOOK_SENSITIVITY: 0.0045,
+    TOUCH_LOOK_SENSITIVITY: 0.0038,
+    FOLLOW_SMOOTH: 16.0,
+    FOLLOW_SMOOTH_ADS: 22.0,
     PITCH_MIN: -0.5,
     PITCH_MAX: 1.25
   },
@@ -79,6 +167,18 @@ var CONFIG = {
       flash: 11,
       damageHead: 100,
       damageBody: 35
+    },
+    shotgun: {
+      label: 'SHOTGUN',
+      auto: false,
+      rps: 1.15,
+      pellets: 8,
+      spread: 0.072,
+      spreadAds: 0.038,
+      kick: 0.11,
+      flash: 26,
+      damageHead: 100,
+      damageBody: 28
     }
   },
 
@@ -144,13 +244,22 @@ var CONFIG = {
   // Graphics & Rendering Pipeline
   GRAPHICS: {
     SHADOW_MAP_SIZE: 512,
+    SHADOW_MAP_SIZE_DESKTOP: 1024,
+    SHADOW_MAP_SIZE_MOBILE: 512,
     SHADOW_BLUR_KERNEL: 12,
     GLOW_TEXTURE_RATIO: 0.25,
-    GLOW_INTENSITY: 0.55,
+    GLOW_INTENSITY: 0.7,
+    GLOW_INTENSITY_MOBILE: 0.45,
     FPS_LOW_THRESHOLD_DESKTOP: 28,
     FPS_HIGH_THRESHOLD_DESKTOP: 50,
     FPS_LOW_THRESHOLD_MOBILE: 24,
-    FPS_HIGH_THRESHOLD_MOBILE: 52
+    FPS_HIGH_THRESHOLD_MOBILE: 52,
+    MAX_DPR_DESKTOP: 2,
+    MAX_DPR_MOBILE: 1.5,
+    CONTRAST: 1.14,
+    EXPOSURE: 1.06,
+    VIGNETTE_WEIGHT: 1.28,
+    BLOOM_WEIGHT: 0.16
   },
 
   // Audio Engine
@@ -158,6 +267,21 @@ var CONFIG = {
     MASTER_VOLUME: 0.5,
     WIND_VOLUME: 0.013,
     SFX_VOLUME: 0.8
+  },
+
+  // 3D GLB Asset Models (External Assets with Procedural Fallbacks)
+  MODELS: {
+    ENABLED: true,
+    BASE_PATH: 'assets/models/',
+    ASSETS: {
+      player: 'player_survivor.glb',
+      zombie_walker: 'zombie_walker.glb',
+      zombie_runner: 'zombie_runner.glb',
+      zombie_brute: 'zombie_brute.glb',
+      weapon_pistol: 'weapon_pistol.glb',
+      weapon_rifle: 'weapon_rifle.glb',
+      weapon_shotgun: 'weapon_shotgun.glb'
+    }
   }
 };
 

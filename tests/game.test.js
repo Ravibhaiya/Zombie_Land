@@ -36,12 +36,24 @@ test('Configuration: Required structure & valid bounds', () => {
   assert(config.PLAYER, 'PLAYER config must exist');
   assert(config.PLAYER.WALK_SPEED > 0, 'Walk speed must be positive');
   assert(config.PLAYER.SPRINT_SPEED > config.PLAYER.WALK_SPEED, 'Sprint speed must exceed walk speed');
-  assert(config.WEAPONS.pistol && config.WEAPONS.rifle, 'Pistol and Rifle must be defined');
+  assert(config.WEAPONS.pistol && config.WEAPONS.rifle && config.WEAPONS.shotgun, 'Pistol, Rifle, and Shotgun must be defined');
   assert(config.WEAPONS.pistol.damageHead === 100, 'Headshot damage must be 100');
+  assert(config.WEAPONS.shotgun.pellets === 8, 'Shotgun must fire 8 buckshot pellets');
   assert(config.ZOMBIES.TYPES.walker && config.ZOMBIES.TYPES.runner && config.ZOMBIES.TYPES.brute, 'All 3 zombie types must be defined');
 });
 
-// 2. Headless Babylon Sandbox Setup
+// 2. Test Vercel Configuration & Routing
+test('Vercel Config: Valid JSON, headers, and GLB MIME types', () => {
+  const vercelRaw = fs.readFileSync(path.join(__dirname, '../vercel.json'), 'utf8');
+  const vercel = JSON.parse(vercelRaw);
+  assert(vercel.headers && vercel.headers.length > 0, 'vercel.json must define headers');
+  const glbRule = vercel.headers.find(h => h.source.includes('.glb'));
+  assert(glbRule, 'Must contain header rule for .glb files');
+  const glbMime = glbRule.headers.find(h => h.key === 'Content-Type');
+  assert(glbMime && glbMime.value === 'model/gltf-binary', '.glb MIME type must be model/gltf-binary');
+});
+
+// 3. Headless Babylon Sandbox Setup
 const BABYLON = require('../js/babylon.js');
 
 const sandbox = {
@@ -56,7 +68,7 @@ const sandbox = {
       offsetWidth: 100,
       getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 })
     }),
-    body: { classList: { add: () => {} } },
+    body: { classList: { add: () => {}, remove: () => {}, toggle: () => {} } },
     addEventListener: () => {},
     pointerLockElement: null,
     createElement: () => ({
@@ -88,11 +100,37 @@ const sandbox = {
 sandbox.window.window = sandbox.window;
 sandbox.window.document = sandbox.document;
 sandbox.window.CONFIG = config;
+sandbox.CONFIG = config;
 
 const ctx = vm.createContext(sandbox);
 
-// 3. Load & Initialize World Generation
-test('World Generation: Builds enterable houses, doors, loot & platforms', () => {
+// 4. Test Models System, Procedural Fallbacks & Binary GLB Integrity
+test('Model Loader: GLB pipeline, binary integrity & procedural fallback', () => {
+  const modelsCode = fs.readFileSync(path.join(__dirname, '../js/models.js'), 'utf8');
+  vm.runInContext(modelsCode, ctx);
+
+  assert(ctx.MODEL_LOADER, 'MODEL_LOADER must be defined');
+  assert(typeof ctx.MODEL_LOADER.loadGLB === 'function', 'loadGLB method must exist');
+  assert(typeof ctx.MODEL_LOADER.instantiate === 'function', 'instantiate method must exist');
+  assert(typeof ctx.MODEL_LOADER.preloadAll === 'function', 'preloadAll method must exist');
+  assert(ctx.MODEL_LOADER.has('non_existent') === false, 'has() should return false for missing models');
+
+  // Verify physical binary .glb files
+  const glbFiles = ['weapon_pistol.glb', 'weapon_rifle.glb', 'weapon_shotgun.glb', 'player_survivor.glb', 'zombie_walker.glb'];
+  glbFiles.forEach(file => {
+    const filePath = path.join(__dirname, '../assets/models', file);
+    assert(fs.existsSync(filePath), `Asset ${file} must exist in assets/models/`);
+    const buf = fs.readFileSync(filePath);
+    assert(buf.length > 20, `${file} must have valid byte length`);
+    const magic = buf.readUInt32LE(0);
+    assert(magic === 0x46546C67, `${file} must start with glTF magic header (0x46546C67)`);
+    const version = buf.readUInt32LE(4);
+    assert(version === 2, `${file} must be glTF version 2`);
+  });
+});
+
+// 5. Load & Initialize World Generation & Day/Night System
+test('World Generation & Day/Night: Builds houses, doors, loot & 4-phase cycle', () => {
   const worldCode = fs.readFileSync(path.join(__dirname, '../js/world.js'), 'utf8')
     .replace("new BABYLON.Engine(canvas, true, { stencil: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' })", 'new BABYLON.NullEngine()');
 
@@ -104,6 +142,20 @@ test('World Generation: Builds enterable houses, doors, loot & platforms', () =>
   assert(ctx.DOORS.length >= 8, `Expected >=8 enterable doors, got ${ctx.DOORS.length}`);
   assert(ctx.LOOT_ITEMS.length >= 10, `Expected >=10 scavengeable loot spawns, got ${ctx.LOOT_ITEMS.length}`);
   assert(ctx.vcMat.useVertexColors === true, 'vcMat must have useVertexColors = true');
+
+  // Verify Day / Night System
+  assert(ctx.DAY_NIGHT_SYSTEM, 'DAY_NIGHT_SYSTEM must exist');
+  assert(typeof ctx.DAY_NIGHT_SYSTEM.setTimePhase === 'function', 'setTimePhase must exist');
+  assert(typeof ctx.DAY_NIGHT_SYSTEM.cycleNextPhase === 'function', 'cycleNextPhase must exist');
+
+  // Test cycling through phases
+  const phases = ['morning', 'noon', 'dusk', 'night'];
+  phases.forEach(p => {
+    ctx.DAY_NIGHT_SYSTEM.setTimePhase(p);
+    assert(ctx.DAY_NIGHT_SYSTEM.getPhase() === p, `Phase should be ${p}`);
+    const td = ctx.DAY_NIGHT_SYSTEM.getTimeData();
+    assert(td.icon && td.label, `Phase ${p} must have icon and label`);
+  });
 });
 
 // 4. Test 3D Physics, Platform Elevation & Collision Resolution
@@ -153,6 +205,12 @@ test('Main Game: Player, Zombies, Gunplay & 60-Frame Render Loop', () => {
 
   ctx.begin();
   assert(ctx.state === 'playing', 'Game state must transition to playing on begin()');
+
+  // Test weapon switching
+  ctx.switchWeapon('shotgun');
+  assert(ctx.player.cur === 'shotgun', 'Player should equip shotgun');
+  ctx.cycleNextWeapon();
+  assert(ctx.player.cur === 'pistol', 'Cycle next weapon from shotgun should return to pistol');
 
   // Simulate 60 frames
   for (let i = 0; i < 60; i++) {

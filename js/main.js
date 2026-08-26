@@ -1,7 +1,22 @@
 'use strict';
 
-var MOBILE = (('ontouchstart' in window) || (navigator.maxTouchPoints > 0)) && window.matchMedia('(pointer: coarse)').matches;
+var MOBILE = (('ontouchstart' in window) || (navigator.maxTouchPoints > 0)) || (window.innerWidth <= 1024 && window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 if (MOBILE) document.body.classList.add('mobile');
+
+window.addEventListener('touchstart', function () {
+  if (!MOBILE) {
+    MOBILE = true;
+    document.body.classList.add('mobile');
+  }
+}, { passive: true, once: true });
+
+function checkOrientation() {
+  var isPortrait = window.innerHeight > window.innerWidth && window.innerWidth <= 900;
+  document.body.classList.toggle('portrait', isPortrait);
+}
+window.addEventListener('resize', checkOrientation);
+window.addEventListener('orientationchange', checkOrientation);
+checkOrientation();
 
 var elHP = document.getElementById('hpFill');
 var elKills = document.getElementById('killsVal');
@@ -20,11 +35,25 @@ var elStartHint = document.getElementById('startHint');
 var elJoy = document.getElementById('joy');
 var elKnob = document.getElementById('joyKnob');
 var btnFire = document.getElementById('btnFire');
+var btnAds = document.getElementById('btnAds');
 var btnJump = document.getElementById('btnJump');
 var btnDoor = document.getElementById('btnDoor');
 var btnSwap = document.getElementById('btnSwap');
 
 elStartHint.textContent = MOBILE ? 'TAP TO ENTER THE CITY' : 'CLICK TO ENTER THE CITY';
+
+// Dynamic Tactical Flashlight / Weapon Light
+var flashLight = new BABYLON.SpotLight(
+  'playerFlashlight',
+  new BABYLON.Vector3(0, 1.5, 0),
+  new BABYLON.Vector3(0, 0, 1),
+  0.65,
+  2.5,
+  scene
+);
+flashLight.intensity = 2.4;
+flashLight.diffuse = new BABYLON.Color3(1.0, 0.96, 0.85);
+flashLight.range = 38;
 
 var tNow = 0;
 var state = 'menu';
@@ -49,8 +78,11 @@ var wantJump = false;
 
 var keys = {};
 var joyX = 0, joyY = 0;
+var joyTargetX = 0, joyTargetY = 0;
 var joyId = null, lookId = null;
 var lookLast = [0, 0];
+var lookFiltX = 0, lookFiltY = 0;
+var camLook = null;
 
 var ZOMBIES = [];
 var zombieParts = [], zombieKinds = [], zombieOwners = [];
@@ -100,78 +132,161 @@ function limb(parent, x, y, z, w, len, hex) {
 
 function buildWeaponModels() {
   var ga = player.gunAnchor;
+
+  // 1. Tactical 9mm Combat Pistol
   var pistol = new BABYLON.TransformNode('pistol', scene);
   pistol.parent = ga;
-  box(0.09, 0.12, 0.4, 0, 0, 0.14, '#3a3f45', pistol);
-  var grip = box(0.085, 0.2, 0.11, 0, -0.13, -0.02, '#5f3f2f', pistol);
-  grip.rotation.x = 0.3;
-  var pb = cyl(0.05, 0.05, 0.1, 0, 0.01, 0.37, '#2c3036', pistol, 8);
+  box(0.088, 0.11, 0.42, 0, 0.01, 0.14, '#24282c', pistol);
+  box(0.082, 0.08, 0.38, 0, -0.05, 0.13, '#1c1e21', pistol);
+  box(0.092, 0.08, 0.08, 0, 0.01, 0.01, '#181a1d', pistol);
+  box(0.045, 0.04, 0.09, 0.024, 0.05, 0.08, '#c8a245', pistol);
+  var grip = box(0.082, 0.22, 0.12, 0, -0.14, -0.03, '#1c1e21', pistol);
+  grip.rotation.x = 0.32;
+  box(0.086, 0.16, 0.09, 0, -0.13, -0.03, '#2a2622', pistol);
+  var pFront = sph(0.018, 0, 0.075, 0.33, '#00ff66', pistol, 4);
+  pFront.material = mat('#00ff66', { e: '#00ff66' });
+  var pRearL = sph(0.015, -0.032, 0.075, -0.04, '#00ff66', pistol, 4);
+  pRearL.material = mat('#00ff66', { e: '#00ff66' });
+  var pRearR = sph(0.015, 0.032, 0.075, -0.04, '#00ff66', pistol, 4);
+  pRearR.material = mat('#00ff66', { e: '#00ff66' });
+  var pLight = cyl(0.034, 0.034, 0.14, 0, -0.08, 0.24, '#1c1f22', pistol, 8);
+  pLight.rotation.x = Math.PI / 2;
+  var pLens = cyl(0.03, 0.03, 0.02, 0, -0.08, 0.32, '#88eeff', pistol, 6);
+  pLens.rotation.x = Math.PI / 2;
+  pLens.material = mat('#88eeff', { e: '#44aacc' });
+  var pb = cyl(0.04, 0.04, 0.08, 0, 0.015, 0.38, '#141618', pistol, 8);
   pb.rotation.x = Math.PI / 2;
-  box(0.03, 0.03, 0.06, 0, 0.075, 0.02, '#2c3036', pistol);
 
+  // 2. Tactical AR-15 / M4 Carbine
   var rifle = new BABYLON.TransformNode('rifle', scene);
   rifle.parent = ga;
-  box(0.09, 0.14, 0.66, 0, 0, 0.18, '#3a4046', rifle);
-  box(0.08, 0.16, 0.24, 0, -0.02, -0.26, '#5f4a33', rifle);
-  var mag = box(0.07, 0.22, 0.12, 0, -0.17, 0.08, '#2c3036', rifle);
-  mag.rotation.x = 0.15;
-  box(0.07, 0.1, 0.09, 0, -0.12, 0.36, '#2c3036', rifle);
-  var rb = cyl(0.045, 0.045, 0.28, 0, 0.02, 0.63, '#2c3036', rifle, 8);
+  box(0.085, 0.13, 0.44, 0, 0, 0.12, '#202428', rifle);
+  box(0.078, 0.11, 0.34, 0, 0.01, 0.46, '#282c30', rifle);
+  box(0.065, 0.04, 0.16, 0, 0.095, 0.14, '#181b1e', rifle);
+  box(0.075, 0.09, 0.14, 0, 0.14, 0.14, '#181b1e', rifle);
+  var reticle = sph(0.02, 0, 0.14, 0.14, '#00ff88', rifle, 4);
+  reticle.material = mat('#00ff88', { e: '#00ff88' });
+  var rb = cyl(0.038, 0.038, 0.32, 0, 0.015, 0.72, '#141719', rifle, 8);
   rb.rotation.x = Math.PI / 2;
-  box(0.04, 0.06, 0.12, 0, 0.115, 0.05, '#2c3036', rifle);
+  var fh = cyl(0.046, 0.042, 0.08, 0, 0.015, 0.9, '#181b1e', rifle, 8);
+  fh.rotation.x = Math.PI / 2;
+  var fg = cyl(0.038, 0.034, 0.16, 0, -0.12, 0.46, '#181a1c', rifle, 8);
+  var mag = box(0.068, 0.26, 0.13, 0, -0.18, 0.1, '#1c1f22', rifle);
+  mag.rotation.x = 0.18;
+  var stTube = cyl(0.036, 0.036, 0.28, 0, 0.01, -0.22, '#282c30', rifle, 8);
+  stTube.rotation.x = Math.PI / 2;
+  box(0.075, 0.16, 0.2, 0, -0.03, -0.32, '#1c1e21', rifle);
 
+  // 3. Tactical 12-Gauge Pump-Action Shotgun
+  var shotgun = new BABYLON.TransformNode('shotgun', scene);
+  shotgun.parent = ga;
+  box(0.095, 0.14, 0.42, 0, 0.01, 0.12, '#25292d', shotgun);
+  box(0.05, 0.05, 0.09, 0.026, 0.05, 0.1, '#b71c1c', shotgun);
+  var sb = cyl(0.048, 0.048, 0.52, 0, 0.035, 0.52, '#1a1d20', shotgun, 8);
+  sb.rotation.x = Math.PI / 2;
+  var smag = cyl(0.042, 0.042, 0.46, 0, -0.025, 0.48, '#202427', shotgun, 8);
+  smag.rotation.x = Math.PI / 2;
+  var pump = box(0.092, 0.11, 0.22, 0, -0.01, 0.44, '#1c1e21', shotgun);
+  var sgGrip = box(0.084, 0.2, 0.11, 0, -0.13, -0.04, '#181b1d', shotgun);
+  sgGrip.rotation.x = 0.32;
+  box(0.08, 0.15, 0.26, 0, -0.02, -0.24, '#202326', shotgun);
+
+  // Muzzle Anchors
   var pm = new BABYLON.TransformNode('muzP', scene);
-  pm.parent = pistol;
-  pm.position.set(0, 0.01, 0.44);
+  pm.parent = pistol; pm.position.set(0, 0.015, 0.44);
   var rm = new BABYLON.TransformNode('muzR', scene);
-  rm.parent = rifle;
-  rm.position.set(0, 0.02, 0.79);
+  rm.parent = rifle; rm.position.set(0, 0.015, 0.94);
+  var sm = new BABYLON.TransformNode('muzS', scene);
+  sm.parent = shotgun; sm.position.set(0, 0.035, 0.8);
 
   player.weapons.pistol = pistol;
   player.weapons.rifle = rifle;
+  player.weapons.shotgun = shotgun;
   player.muzzle.pistol = pm;
   player.muzzle.rifle = rm;
+  player.muzzle.shotgun = sm;
+
   rifle.setEnabled(false);
+  shotgun.setEnabled(false);
 }
 
-var WPN = {
-  pistol: { label: 'PISTOL', auto: false, rps: 3.6, spread: 0.011, spreadAds: 0.002, kick: 0.05, flash: 15 },
-  rifle: { label: 'RIFLE', auto: true, rps: 9, spread: 0.034, spreadAds: 0.009, kick: 0.024, flash: 11 }
+var WPN = (typeof CONFIG !== 'undefined' && CONFIG.WEAPONS) ? CONFIG.WEAPONS : {
+  pistol: { label: 'PISTOL', auto: false, rps: 3.6, spread: 0.011, spreadAds: 0.002, kick: 0.05, flash: 15, damageHead: 100, damageBody: 25 },
+  rifle: { label: 'RIFLE', auto: true, rps: 9.0, spread: 0.034, spreadAds: 0.009, kick: 0.024, flash: 11, damageHead: 100, damageBody: 35 },
+  shotgun: { label: 'SHOTGUN', auto: false, rps: 1.15, pellets: 8, spread: 0.072, spreadAds: 0.038, kick: 0.11, flash: 26, damageHead: 100, damageBody: 28 }
 };
 
+var WPN_ORDER = ['pistol', 'rifle', 'shotgun'];
 function switchWeapon(name) {
-  if (name === player.cur || state === 'dead') return;
+  if (!player.weapons[name] || name === player.cur || state === 'dead') return;
   player.weapons[player.cur].setEnabled(false);
   player.weapons[name].setEnabled(true);
   player.cur = name;
   player.gunDip = 1;
   sfxSwap();
+  if (name === 'shotgun') setTimeout(sfxPump, 150);
   elWpn.textContent = WPN[name].label;
+}
+function cycleNextWeapon() {
+  var idx = WPN_ORDER.indexOf(player.cur);
+  var next = WPN_ORDER[(idx + 1) % WPN_ORDER.length];
+  switchWeapon(next);
 }
 
 function buildPlayer() {
   var root = new BABYLON.TransformNode('playerRoot', scene);
   var body = new BABYLON.TransformNode('playerBody', scene);
   body.parent = root;
-  box(0.58, 0.72, 0.36, 0, 1.2, 0, '#3f7fbf', body);
-  box(0.54, 0.22, 0.34, 0, 0.86, 0, '#35455f', body);
-  box(0.4, 0.5, 0.2, 0, 1.24, -0.27, '#c96a3f', body);
+
+  // 1. Torso & Tactical MOLLE Chest Rig
+  box(0.58, 0.72, 0.36, 0, 1.2, 0, '#2d3d34', body);
+  box(0.62, 0.44, 0.4, 0, 1.22, 0, '#1f2922', body);
+  box(0.14, 0.18, 0.1, -0.16, 1.18, 0.23, '#2a382e', body);
+  box(0.14, 0.18, 0.1, 0, 1.18, 0.23, '#2a382e', body);
+  box(0.14, 0.18, 0.1, 0.16, 1.18, 0.23, '#2a382e', body);
+  box(0.1, 0.16, 0.08, -0.22, 1.5, 0.06, '#181b1d', body);
+  var ant = cyl(0.015, 0.015, 0.18, -0.22, 1.66, 0.06, '#111315', body, 4);
+
+  // 2. Rugged Survival Backpack & Rolled Bedroll
+  box(0.44, 0.54, 0.24, 0, 1.26, -0.28, '#3d3024', body);
+  var bedroll = cyl(0.16, 0.16, 0.46, 0, 1.58, -0.28, '#253528', body, 8);
+  bedroll.rotation.z = Math.PI / 2;
+  box(0.12, 0.2, 0.12, -0.24, 1.22, -0.26, '#1f2620', body);
+
+  // 3. Head, Ballistic Cap & Headlamp
   sph(0.5, 0, 1.78, 0, '#f0c49a', body, 12);
-  var cap = sph(0.5, 0, 1.87, -0.02, '#d9483f', body, 10);
+  var cap = sph(0.5, 0, 1.87, -0.02, '#1f2822', body, 10);
   cap.scaling.y = 0.55;
-  box(0.4, 0.06, 0.26, 0, 1.84, 0.24, '#d9483f', body);
-  sph(0.1, -0.1, 1.8, 0.21, '#ffffff', body, 7);
-  sph(0.1, 0.1, 1.8, 0.21, '#ffffff', body, 7);
-  sph(0.05, -0.1, 1.8, 0.252, '#222222', body, 6);
-  sph(0.05, 0.1, 1.8, 0.252, '#222222', body, 6);
-  var armL = limb(body, -0.36, 1.44, 0, 0.17, 0.62, '#f0c49a');
-  var armR = limb(body, 0.36, 1.44, 0, 0.17, 0.62, '#f0c49a');
+  box(0.4, 0.06, 0.26, 0, 1.84, 0.24, '#1f2822', body);
+  var hLamp = box(0.12, 0.08, 0.08, 0, 1.86, 0.26, '#181a1c', body);
+  var hLens = cyl(0.035, 0.035, 0.02, 0, 1.86, 0.31, '#88eeff', body, 6);
+  hLens.rotation.x = Math.PI / 2;
+  hLens.material = mat('#88eeff', { e: '#88eeff' });
+
+  sph(0.09, -0.1, 1.8, 0.21, '#ffffff', body, 7);
+  sph(0.09, 0.1, 1.8, 0.21, '#ffffff', body, 7);
+  sph(0.045, -0.1, 1.8, 0.252, '#222222', body, 6);
+  sph(0.045, 0.1, 1.8, 0.252, '#222222', body, 6);
+
+  // 4. Arms with Fingerless Gloves & Rolled Sleeves
+  var armL = limb(body, -0.38, 1.44, 0, 0.17, 0.62, '#2d3d34');
+  var armR = limb(body, 0.38, 1.44, 0, 0.17, 0.62, '#2d3d34');
+  box(0.16, 0.12, 0.16, 0, -0.22, 0, '#f0c49a', armL.p);
+  box(0.16, 0.12, 0.16, 0, -0.22, 0, '#f0c49a', armR.p);
+  box(0.16, 0.14, 0.16, 0, -0.36, 0, '#1c1e20', armL.p);
+  box(0.16, 0.14, 0.16, 0, -0.36, 0, '#1c1e20', armR.p);
   armL.p.rotation.x = -1.32; armL.p.rotation.z = 0.42;
   armR.p.rotation.x = -1.2; armR.p.rotation.z = -0.1;
-  var legL = limb(body, -0.15, 0.82, 0, 0.19, 0.76, '#35455f');
-  var legR = limb(body, 0.15, 0.82, 0, 0.19, 0.76, '#35455f');
-  box(0.21, 0.12, 0.32, 0, -0.76, 0.05, '#33393f', legL.p);
-  box(0.21, 0.12, 0.32, 0, -0.76, 0.05, '#33393f', legR.p);
+
+  // 5. Tactical Pants, Drop-Leg Holster & Combat Boots
+  box(0.54, 0.22, 0.34, 0, 0.86, 0, '#222b25', body);
+  var legL = limb(body, -0.16, 0.82, 0, 0.2, 0.78, '#222b25');
+  var legR = limb(body, 0.16, 0.82, 0, 0.2, 0.78, '#222b25');
+  box(0.18, 0.16, 0.08, 0, -0.42, 0.11, '#151819', legL.p);
+  box(0.18, 0.16, 0.08, 0, -0.42, 0.11, '#151819', legR.p);
+  box(0.08, 0.18, 0.14, 0.12, -0.22, 0, '#141618', legR.p);
+  box(0.22, 0.16, 0.34, 0, -0.76, 0.06, '#18191b', legL.p);
+  box(0.22, 0.16, 0.34, 0, -0.76, 0.06, '#18191b', legR.p);
 
   player.root = root;
   player.body = body;
@@ -188,10 +303,10 @@ function buildPlayer() {
   root.rotation.y = Math.PI;
 }
 
-var flashLight = new BABYLON.PointLight('flash', V(0, -50, 0), scene);
-flashLight.intensity = 0;
-flashLight.diffuse = new BABYLON.Color3(1, 0.85, 0.5);
-flashLight.range = 18;
+var muzzleFlashLight = new BABYLON.PointLight('muzzleFlash', V(0, -50, 0), scene);
+muzzleFlashLight.intensity = 0;
+muzzleFlashLight.diffuse = new BABYLON.Color3(1, 0.85, 0.5);
+muzzleFlashLight.range = 18;
 var flashMesh = BABYLON.MeshBuilder.CreateSphere('flashM', { diameter: 0.32, segments: 6 }, scene);
 var flashMat = new BABYLON.StandardMaterial('flashMat', scene);
 flashMat.emissiveColor = new BABYLON.Color3(1, 0.85, 0.45);
@@ -208,13 +323,22 @@ function tracer(a, b) {
   setTimeout(function () { line.dispose(); }, 70);
 }
 
-var ZSKINS = ['#7fbf4d', '#6aa84f', '#8fbf6a', '#5f9e4a'];
-var ZSHIRTS = ['#5b5b6b', '#7a5c48', '#4a6b5b', '#6b4a5b', '#55606e'];
-var ZPANTS = ['#3f4a41', '#4a4438', '#39424f'];
+var laserDot = BABYLON.MeshBuilder.CreateSphere('laserDot', { diameter: 0.08, segments: 4 }, scene);
+var laserMat = new BABYLON.StandardMaterial('laserMat', scene);
+laserMat.emissiveColor = new BABYLON.Color3(1, 0.08, 0.08);
+laserMat.disableLighting = true;
+ALL_MATS.push(laserMat);
+laserDot.material = laserMat;
+laserDot.isVisible = false;
+laserDot.isPickable = false;
+
+var ZSKINS = ['#3d4734', '#323d2e', '#453f36', '#2d3829', '#3e362e'];
+var ZSHIRTS = ['#3f3f4a', '#4a382e', '#2e4237', '#422e38', '#383e47'];
+var ZPANTS = ['#282e29', '#2e2b24', '#242930'];
 var ZTYPES = {
-  walker: { scl: [0.95, 1.08], speed: [2.2, 3.0], sense: 38, dmg: [8, 11], thin: 1, armW: 0 },
-  runner: { scl: [0.88, 0.96], speed: [4.4, 5.2], sense: 46, dmg: [6, 8], thin: 0.78, armW: -0.03 },
-  brute: { scl: [1.28, 1.42], speed: [1.7, 2.1], sense: 34, dmg: [15, 20], thin: 1.08, armW: 0.05 }
+  walker: { scl: [0.95, 1.08], speed: [2.2, 3.0], sense: 38, dmg: [8, 11], thin: 1, armW: 0, eyeColor: '#ffbb00' },
+  runner: { scl: [0.88, 0.96], speed: [4.4, 5.2], sense: 46, dmg: [6, 8], thin: 0.78, armW: -0.03, eyeColor: '#ff2200' },
+  brute: { scl: [1.32, 1.48], speed: [1.7, 2.1], sense: 34, dmg: [16, 22], thin: 1.15, armW: 0.08, eyeColor: '#ff0055' }
 };
 
 function spawnZombie(x, z, typeName, rise) {
@@ -226,28 +350,66 @@ function spawnZombie(x, z, typeName, rise) {
   var root = new BABYLON.TransformNode('z', scene);
   var body = new BABYLON.TransformNode('', scene);
   body.parent = root;
+
+  // 1. Torso with Rotting Flesh & Tattered Shirts
   var torso = box(0.74, 0.92, 0.46, 0, 1.22, 0, shirt, body);
   box(0.52, 0.24, 0.48, 0, 0.84, 0, skin, body);
   box(0.62, 0.26, 0.42, 0, 0.78, 0, pants, body);
+
+  // 2. Exposed Skeletal Rib Cage & Gore
+  box(0.52, 0.05, 0.08, 0, 1.46, 0.24, '#d8d3c5', body);
+  box(0.56, 0.05, 0.08, 0, 1.34, 0.24, '#d8d3c5', body);
+  box(0.48, 0.05, 0.08, 0, 1.22, 0.24, '#d8d3c5', body);
+  box(0.12, 0.42, 0.06, 0, 1.32, 0.25, '#780c0c', body);
+
+  // 3. Head & Terrifying Facial Features
   var head = sph(0.68, 0, 1.94, 0, skin, body, 10);
   head.rotation.z = rand(-0.14, 0.14);
+  if (typeName === 'runner') head.rotation.x = 0.22;
+
+  // Glowing Infected Horror Eyes
+  var eyeL = sph(0.09, -0.16, 0.06, 0.32, T.eyeColor, head, 6);
+  eyeL.material = mat(T.eyeColor, { e: T.eyeColor });
+  var eyeR = sph(0.09, 0.16, 0.06, 0.32, T.eyeColor, head, 6);
+  eyeR.material = mat(T.eyeColor, { e: T.eyeColor });
+
+  // Blood-Soaked Jaw & Exposed Teeth
+  box(0.36, 0.14, 0.14, 0, -0.18, 0.28, '#660808', head);
+  box(0.24, 0.04, 0.04, 0, -0.12, 0.34, '#f0ede0', head);
+  box(0.22, 0.04, 0.04, 0, -0.22, 0.34, '#f0ede0', head);
+
   var bandMat = new BABYLON.StandardMaterial('band' + Math.random(), scene);
-  bandMat.diffuseColor = BABYLON.Color3.FromHexString('#232830');
+  bandMat.diffuseColor = BABYLON.Color3.FromHexString('#4a0808');
   bandMat.specularColor = BABYLON.Color3.Black();
-  var band = box(0.46, 0.15, 0.1, 0, 0.06, 0.3, '#232830', head);
+  var band = box(0.48, 0.14, 0.08, 0, 0.18, 0.3, '#4a0808', head);
   band.material = bandMat;
-  box(0.28, 0.1, 0.06, 0, -0.19, 0.31, '#2d2320', head);
-  box(0.16, 0.05, 0.03, 0, -0.135, 0.315, '#e8e4d0', head);
-  var armL = limb(body, -0.47, 1.52, 0, 0.17 + T.armW, 0.66, skin);
-  var armR = limb(body, 0.47, 1.52, 0, 0.17 + T.armW, 0.66, skin);
+
+  // 4. Arms with Bloody Claws
+  var armL = limb(body, -0.48, 1.52, 0, 0.18 + T.armW, 0.68, skin);
+  var armR = limb(body, 0.48, 1.52, 0, 0.18 + T.armW, 0.68, skin);
   armL.p.rotation.x = -1.32; armR.p.rotation.x = -1.32;
-  armL.p.rotation.z = 0.1; armR.p.rotation.z = -0.1;
-  var legL = limb(body, -0.16, 0.84, 0, 0.19, 0.8, pants);
-  var legR = limb(body, 0.16, 0.84, 0, 0.19, 0.8, pants);
+  armL.p.rotation.z = 0.12; armR.p.rotation.z = -0.12;
+  box(0.14, 0.18, 0.16, 0, -0.36, 0, '#660808', armL.p);
+  box(0.14, 0.18, 0.16, 0, -0.36, 0, '#660808', armR.p);
+
+  // 5. Brute Hulking Bone Protrusions & Spikes
+  if (typeName === 'brute') {
+    sph(0.42, -0.48, 1.62, 0, '#4a382e', body, 8);
+    var spur1 = cyl(0.08, 0.02, 0.55, -0.52, 1.82, 0.12, '#dfd9c9', body, 6);
+    spur1.rotation.z = 0.45;
+    var spur2 = cyl(0.06, 0.02, 0.42, 0.48, 1.72, -0.1, '#dfd9c9', body, 6);
+    spur2.rotation.z = -0.35;
+  }
+
+  // 6. Decaying Legs
+  var legL = limb(body, -0.16, 0.84, 0, 0.2, 0.8, pants);
+  var legR = limb(body, 0.16, 0.84, 0, 0.2, 0.8, pants);
+
   root.scaling.set(scl * T.thin, scl, scl * T.thin);
   root.position.set(x, rise ? -1.8 : 0, z);
   var sh = makeShadow(0.8 * scl, root);
   castShadow(root);
+
   var zb = {
     root: root, body: body, head: head, bandMat: bandMat,
     armL: armL.p, armR: armR.p, legL: legL.p, legR: legR.p,
@@ -295,12 +457,15 @@ function killZombie(z, pt) {
   if (z.state === 'dead') return;
   z.state = 'dead';
   z.deadT = 0;
-  z.head.setEnabled(false);
-  burst(pt, 'goo', 10, 7, 1, 0.9, 0.5, 1.4);
-  burst(pt, 'blood', 12, 8, 1, 0.7, 0.4, 1);
+  z.head.setEnabled(false); // Cranial rupture decapitation
+  sfxBoneSnap();
+  burst(pt, 'blood', 20, 9, 1.3, 0.9, 0.4, 1.4);
+  burst(pt, 'bone', 10, 8, 1.5, 0.8, 0.25, 0.6);
+  burst(pt, 'meat', 8, 6, 1.2, 0.7, 0.3, 0.75);
+  burst(pt, 'goo', 10, 7, 1.2, 0.8, 0.4, 1.2);
   kills++;
   elKills.textContent = kills;
-  var hs = ['HEADSHOT!', 'BOOM!', 'SPLAT!', 'NICE SHOT!', 'DOWN!'];
+  var hs = ['HEADSHOT!', 'OBLITERATED!', 'SPLAT!', 'CRITICAL KILL!', 'DOWN!'];
   msg(hs[Math.floor(Math.random() * hs.length)], 1.2, 'hs gold');
   chFlash('hs', 220);
   chFlash('kick', 120);
@@ -383,18 +548,23 @@ function updatePlayer(dt) {
     if (keys.KeyS || keys.ArrowDown) iy -= 1;
     if (keys.KeyA || keys.ArrowLeft) ix -= 1;
     if (keys.KeyD || keys.ArrowRight) ix += 1;
+    var jK = smooth(18, dt);
+    joyX += (joyTargetX - joyX) * jK;
+    joyY += (joyTargetY - joyY) * jK;
+    if (Math.abs(joyX) < 0.04) joyX = 0;
+    if (Math.abs(joyY) < 0.04) joyY = 0;
     ix += joyX; iy += -joyY;
   }
   var mag = Math.hypot(ix, iy);
   if (mag > 1) { ix /= mag; iy /= mag; }
-  var sprint = (keys.Shift || keys.ShiftLeft || keys.ShiftRight || Math.hypot(joyX, joyY) > 0.93) && mag > 0.1;
+  var sprint = (keys.Shift || keys.ShiftLeft || keys.ShiftRight || Math.hypot(joyX, joyY) > 0.85) && mag > 0.1;
   p.sprinting = sprint && state === 'playing';
   var spd = sprint ? 10 : 6.3;
   var fx = Math.sin(camYaw), fz = Math.cos(camYaw);
   var rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
   var wx = (fx * iy + rx * ix) * spd;
   var wz = (fz * iy + rz * ix) * spd;
-  var k = smooth(12, dt);
+  var k = smooth(14, dt);
   p.vx += (wx - p.vx) * k;
   p.vz += (wz - p.vz) * k;
   var kd = Math.exp(-6 * dt);
@@ -563,6 +733,9 @@ function updatePlayer(dt) {
 var RING_BASE = BABYLON.Color3.FromHexString('#59e3ff');
 
 function updateWorldFX(dt) {
+  if (typeof DAY_NIGHT_SYSTEM !== 'undefined' && DAY_NIGHT_SYSTEM.update) {
+    DAY_NIGHT_SYSTEM.update(dt);
+  }
   updateLoot(dt);
   for (var i = 0; i < clouds.length; i++) {
     var c = clouds[i];
@@ -581,14 +754,16 @@ function updateWorldFX(dt) {
   for (var w = 0; w < waterMats.length; w++) {
     waterMats[w].alpha = 0.74 + 0.08 * Math.sin(tNow * 3 + w);
   }
+  var lanternBase = (typeof DAY_NIGHT_SYSTEM !== 'undefined' && DAY_NIGHT_SYSTEM.getLanternIntensity)
+    ? DAY_NIGHT_SYSTEM.getLanternIntensity() : 1.25;
   for (var l = 0; l < lanternLights.length; l++) {
-    lanternLights[l].intensity = 1.25 + 0.16 * Math.sin(tNow * 13 + l * 3.7) + 0.05 * (Math.random() - 0.5);
+    lanternLights[l].intensity = lanternBase * (1.05 + 0.12 * Math.sin(tNow * 13 + l * 3.7) + 0.04 * (Math.random() - 0.5));
   }
-  if (flashLight.intensity > 0.01) {
-    flashLight.intensity *= Math.exp(-26 * dt);
+  if (muzzleFlashLight.intensity > 0.01) {
+    muzzleFlashLight.intensity *= Math.exp(-26 * dt);
     flashMesh.isVisible = true;
-    flashMesh.visibility = Math.min(1, flashLight.intensity / 8);
-    flashMesh.position.copyFrom(flashLight.position);
+    flashMesh.visibility = Math.min(1, muzzleFlashLight.intensity / 8);
+    flashMesh.position.copyFrom(muzzleFlashLight.position);
   } else {
     flashMesh.isVisible = false;
   }
@@ -621,9 +796,15 @@ function updateZombies(dt) {
     }
     var dx = pp.x - zp.x, dz = pp.z - zp.z;
     var dist = Math.hypot(dx, dz);
-    if (!playerAlive) z.aggro = false;
-    else if (dist < z.sense) { z.aggro = true; z.lostT = 0; }
-    else if (z.aggro) {
+    if (!playerAlive) {
+      z.aggro = false;
+    } else if (dist < z.sense) {
+      if (!z.aggro) {
+        z.aggro = true;
+        z.lostT = 0;
+        if (Math.random() < 0.45) sfxZombieScreech();
+      }
+    } else if (z.aggro) {
       z.lostT += dt;
       if (z.lostT > 5 || dist > 70) z.aggro = false;
     }
@@ -859,89 +1040,103 @@ function fireShot() {
   var spread = w.spread * (1 - adsAmt) + w.spreadAds * adsAmt;
   var effPitch = Math.max(-0.5, Math.min(1.25, camPitch + recoil));
   var cp = Math.cos(effPitch);
-  var dir = V(Math.sin(camYaw) * cp, -Math.sin(effPitch), Math.cos(camYaw) * cp);
+  var baseDir = V(Math.sin(camYaw) * cp, -Math.sin(effPitch), Math.cos(camYaw) * cp);
   var rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
-  var upv = BABYLON.Vector3.Cross(dir, V(rx, 0, rz)).normalize();
-  var g1 = (Math.random() + Math.random() - 1) * spread;
-  var g2 = (Math.random() + Math.random() - 1) * spread;
-  dir = dir.add(V(rx * g1, 0, rz * g1)).add(upv.scale(g2)).normalize();
+  var upv = BABYLON.Vector3.Cross(baseDir, V(rx, 0, rz)).normalize();
   var origin = camera.position.clone();
-  var ray = new BABYLON.Ray(origin, dir, 320);
-
-  var envMin = Infinity, envPoint = null;
-  for (var o = 0; o < OCCLUDERS.length; o++) {
-    var oi = ray.intersectsMesh(OCCLUDERS[o]);
-    if (oi && oi.hit && oi.distance < envMin) {
-      envMin = oi.distance;
-      if (oi.pickedPoint) envPoint = oi.pickedPoint.clone();
-    }
-  }
-  var headMin = Infinity, headPt = null, headZ = null;
-  var bodyMin = Infinity, bodyPt = null, bodyZ = null;
-  for (var i = 0; i < zombieParts.length; i++) {
-    var zi = ray.intersectsMesh(zombieParts[i]);
-    if (!zi || !zi.hit) continue;
-    if (zombieKinds[i] === 'head') {
-      if (zi.distance < headMin) {
-        headMin = zi.distance; headPt = zi.pickedPoint ? zi.pickedPoint.clone() : null; headZ = zombieOwners[i];
-      }
-    } else if (zi.distance < bodyMin) {
-      bodyMin = zi.distance; bodyPt = zi.pickedPoint ? zi.pickedPoint.clone() : null; bodyZ = zombieOwners[i];
-    }
-  }
-
   var muzzleAbs = absPos(player.muzzle[player.cur]);
-  var endPoint = null, result = 'miss';
-  if (headMin < Infinity && headMin < envMin + 0.001 && (bodyMin === Infinity || headMin <= bodyMin + 0.45)) {
-    result = 'head'; endPoint = headPt;
-  } else if (bodyMin < Infinity && bodyMin < envMin + 0.001) {
-    result = 'body'; endPoint = bodyPt;
-  } else if (envMin < Infinity) {
-    result = 'env'; endPoint = envPoint;
-  }
-  if (!endPoint) endPoint = origin.add(dir.scale(90));
 
-  tracer(muzzleAbs, endPoint);
-  flashLight.position.copyFrom(muzzleAbs);
-  flashLight.intensity = w.flash;
+  var numRays = (player.cur === 'shotgun') ? (w.pellets || 8) : 1;
+  var hitAnyHead = false, hitAnyBody = false;
+
+  for (var r = 0; r < numRays; r++) {
+    var g1 = (Math.random() + Math.random() - 1) * spread;
+    var g2 = (Math.random() + Math.random() - 1) * spread;
+    var dir = baseDir.add(V(rx * g1, 0, rz * g1)).add(upv.scale(g2)).normalize();
+    var ray = new BABYLON.Ray(origin, dir, 320);
+
+    var envMin = Infinity, envPoint = null;
+    for (var o = 0; o < OCCLUDERS.length; o++) {
+      var oi = ray.intersectsMesh(OCCLUDERS[o]);
+      if (oi && oi.hit && oi.distance < envMin) {
+        envMin = oi.distance;
+        if (oi.pickedPoint) envPoint = oi.pickedPoint.clone();
+      }
+    }
+    var headMin = Infinity, headPt = null, headZ = null;
+    var bodyMin = Infinity, bodyPt = null, bodyZ = null;
+    for (var i = 0; i < zombieParts.length; i++) {
+      var zi = ray.intersectsMesh(zombieParts[i]);
+      if (!zi || !zi.hit) continue;
+      if (zombieKinds[i] === 'head') {
+        if (zi.distance < headMin) {
+          headMin = zi.distance; headPt = zi.pickedPoint ? zi.pickedPoint.clone() : null; headZ = zombieOwners[i];
+        }
+      } else if (zi.distance < bodyMin) {
+        bodyMin = zi.distance; bodyPt = zi.pickedPoint ? zi.pickedPoint.clone() : null; bodyZ = zombieOwners[i];
+      }
+    }
+
+    var endPoint = null, result = 'miss';
+    if (headMin < Infinity && headMin < envMin + 0.001 && (bodyMin === Infinity || headMin <= bodyMin + 0.45)) {
+      result = 'head'; endPoint = headPt;
+    } else if (bodyMin < Infinity && bodyMin < envMin + 0.001) {
+      result = 'body'; endPoint = bodyPt;
+    } else if (envMin < Infinity) {
+      result = 'env'; endPoint = envPoint;
+    }
+    if (!endPoint) endPoint = origin.add(dir.scale(90));
+
+    tracer(muzzleAbs, endPoint);
+
+    if (result === 'head' && headZ && headZ.state !== 'dead') {
+      killZombie(headZ, headPt || endPoint);
+      hitAnyHead = true;
+    } else if (result === 'body' && bodyZ && bodyZ.state !== 'dead') {
+      bodyZ.flinch = 0.25;
+      bodyZ.enrage = 4;
+      bodyZ.flashT = 1;
+      if (bodyZ.state !== 'rise') { bodyZ.aggro = true; bodyZ.lostT = 0; }
+      if (bodyPt) burst(bodyPt, 'blood', 6, 5, 1, 0.5, 0.3, 0.7);
+      hitAnyBody = true;
+    } else if (result === 'env' && endPoint) {
+      burst(endPoint, 'dust', 4, 3, 1, 0.4, 0.2, 0.6);
+      burst(endPoint, 'spark', 3, 4, 1, 0.3, 0.2, 0.4);
+    }
+  }
+
+  muzzleFlashLight.position.copyFrom(muzzleAbs);
+  muzzleFlashLight.intensity = w.flash;
   recoil += w.kick;
   player.gunKick = 1;
   chFlash('kick', 90);
   sfxShot(player.cur);
 
-  // Eject realistic brass bullet shell
   var rDir = V(Math.cos(camYaw + 0.35), 0.2, -Math.sin(camYaw + 0.35));
-  spawnShell(muzzleAbs, rDir);
+  if (player.cur === 'shotgun') {
+    spawnShellRed(muzzleAbs, rDir);
+    setTimeout(sfxPump, 200);
+  } else {
+    spawnShell(muzzleAbs, rDir);
+  }
 
-  if (result === 'head' && headZ) {
-    killZombie(headZ, headPt || endPoint);
-  } else if (result === 'body' && bodyZ) {
-    bodyZ.flinch = 0.25;
-    bodyZ.enrage = 4;
-    bodyZ.flashT = 1;
-    if (bodyZ.state !== 'rise') { bodyZ.aggro = true; bodyZ.lostT = 0; }
-    if (bodyPt) burst(bodyPt, 'blood', 6, 5, 1, 0.5, 0.3, 0.7);
+  if (hitAnyBody && !hitAnyHead) {
     sfxTick();
     chFlash('hit', 140);
     if (tNow - lastBodyWarn > 2.5) {
       lastBodyWarn = tNow;
       subMsg('BODY HITS ONLY ANGER THEM - AIM FOR THE HEAD!', 2.4);
     }
-  } else if (result === 'env' && endPoint) {
-    burst(endPoint, 'dust', 5, 3.5, 1, 0.5, 0.3, 0.8);
-    burst(endPoint, 'spark', 4, 4.5, 1, 0.3, 0.2, 0.5);
-    burst(endPoint, 'concrete', 4, 3, 1, 0.4, 0.2, 0.6);
-    burst(endPoint, 'wood', 4, 3, 1, 0.4, 0.2, 0.6);
-    sfxWoodHit();
   }
 }
 
 function updateCamera(dt) {
-  var adsTarget = (adsHeld && !MOBILE && state === 'playing') ? 1 : 0;
+  var adsTarget = (adsHeld && state === 'playing') ? 1 : 0;
   adsAmt += (adsTarget - adsAmt) * smooth(12, dt);
   recoil *= Math.exp(-9 * dt);
   elCH.classList.toggle('ads', adsAmt > 0.5);
-  var fovT = 0.9 + (player.sprinting ? 0.06 : 0) - adsAmt * 0.33;
+  var baseFov = (typeof CONFIG !== 'undefined' && CONFIG.CAMERA && CONFIG.CAMERA.BASE_FOV) ? CONFIG.CAMERA.BASE_FOV : 0.86;
+  var fovT = baseFov + (player.sprinting ? 0.05 : 0) - adsAmt * 0.33;
   camera.fov += (fovT - camera.fov) * smooth(10, dt);
 
   var pos = player.root.position;
@@ -949,9 +1144,36 @@ function updateCamera(dt) {
   var cp = Math.cos(effPitch);
   var dirFull = V(Math.sin(camYaw) * cp, -Math.sin(effPitch), Math.cos(camYaw) * cp);
   var rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
-  var target = V(pos.x + rx * 0.52 * (1 - adsAmt * 0.4), pos.y + 1.78, pos.z + rz * 0.52 * (1 - adsAmt * 0.4));
+  var walkBob = (state === 'playing' && player.grounded) ? Math.abs(Math.sin(player.phase)) * 0.07 * Math.min(Math.hypot(player.vx, player.vz) / 9, 1) : 0;
+  var target = V(pos.x + rx * 0.52 * (1 - adsAmt * 0.4), pos.y + 1.78 + walkBob, pos.z + rz * 0.52 * (1 - adsAmt * 0.4));
 
-  var desiredDist = 9.4 - 2.6 * adsAmt;
+  // Dynamic Tactical Flashlight aiming & time-of-day modulation
+  flashLight.position.set(pos.x + rx * 0.2, pos.y + 1.45, pos.z + rz * 0.2);
+  flashLight.direction.copyFrom(dirFull);
+  if (typeof DAY_NIGHT_SYSTEM !== 'undefined') {
+    var curP = DAY_NIGHT_SYSTEM.getPhase();
+    var targetFlash = (curP === 'night') ? 2.4 : ((curP === 'dusk' || curP === 'morning') ? 1.5 : 0.35);
+    flashLight.intensity += (targetFlash - flashLight.intensity) * smooth(6, dt);
+  }
+
+  // Active Tactical Red Laser Sight on Assault Rifle (every other frame on mobile)
+  if (player.cur === 'rifle' && state === 'playing' && (!MOBILE || (_frameCount & 1))) {
+    var muzzlePos = absPos(player.muzzle.rifle);
+    var laserRay = new BABYLON.Ray(muzzlePos, dirFull, 90);
+    var lHit = scene.pickWithRay(laserRay, function (m) {
+      return m !== laserDot && m.isVisible && m.name !== 'flashM' && m.name !== 'flash';
+    });
+    if (lHit && lHit.hit && lHit.pickedPoint) {
+      laserDot.position.copyFrom(lHit.pickedPoint);
+      laserDot.isVisible = true;
+    } else {
+      laserDot.isVisible = false;
+    }
+  } else {
+    laserDot.isVisible = false;
+  }
+
+  var desiredDist = 9.0 - 2.6 * adsAmt;
   var back = dirFull.scale(-1);
   var probeRay = new BABYLON.Ray(target, back, desiredDist + 0.6);
   var maxAllowed = desiredDist;
@@ -975,9 +1197,17 @@ function updateCamera(dt) {
     var e = kk * kk * (3 - 2 * kk);
     camera.position.copyFrom(BABYLON.Vector3.Lerp(startPos, gamePos, e));
     camera.setTarget(BABYLON.Vector3.Lerp(startTarget, gameTarget, e));
+    camLook = gameTarget.clone();
   } else {
-    camera.position.copyFrom(gamePos);
-    camera.setTarget(gameTarget);
+    var followK = smooth(adsAmt > 0.4 ? 22 : 16, dt);
+    camera.position.x += (gamePos.x - camera.position.x) * followK;
+    camera.position.y += (gamePos.y - camera.position.y) * followK;
+    camera.position.z += (gamePos.z - camera.position.z) * followK;
+    if (!camLook) camLook = gameTarget.clone();
+    camLook.x += (gameTarget.x - camLook.x) * followK;
+    camLook.y += (gameTarget.y - camLook.y) * followK;
+    camLook.z += (gameTarget.z - camLook.z) * followK;
+    camera.setTarget(camLook);
   }
   if (shake > 0.002) {
     camera.position.x += rand(-1, 1) * shake * 0.35;
@@ -1003,10 +1233,18 @@ function refreshHUD() {
   if (!low && parseFloat(elVig.style.opacity || 0) === 0) {
     elVig.style.boxShadow = '';
   }
+  if (typeof DAY_NIGHT_SYSTEM !== 'undefined' && DAY_NIGHT_SYSTEM.getTimeData) {
+    var td = DAY_NIGHT_SYSTEM.getTimeData();
+    var elTI = document.getElementById('timeIcon');
+    var elTL = document.getElementById('timeLabel');
+    if (elTI && elTI.textContent !== td.icon) elTI.textContent = td.icon;
+    if (elTL) elTL.textContent = td.timeString + ' ' + td.label;
+  }
 }
 
 var perfAcc = 0;
 var curScale = BASE_SCALE;
+var gfxQuality = 1;
 function perfTick(dt) {
   perfAcc += dt;
   if (perfAcc < 3.5) return;
@@ -1018,9 +1256,17 @@ function perfTick(dt) {
   if (fps < lowThresh && curScale < maxScale) {
     curScale *= 1.15;
     engine.setHardwareScalingLevel(curScale);
+    gfxQuality = Math.max(0, gfxQuality - 1);
   } else if (fps > highThresh && curScale > BASE_SCALE) {
     curScale = Math.max(BASE_SCALE, curScale * 0.94);
     engine.setHardwareScalingLevel(curScale);
+    gfxQuality = Math.min(1, gfxQuality + 1);
+  }
+  if (typeof gfxPipeline !== 'undefined' && gfxPipeline) {
+    var wantFx = gfxQuality > 0 && fps > lowThresh;
+    gfxPipeline.bloomEnabled = wantFx && !MOBILE;
+    gfxPipeline.grainEnabled = wantFx && !MOBILE;
+    gfxPipeline.fxaaEnabled = true;
   }
 }
 
@@ -1036,6 +1282,9 @@ function begin() {
   initAudio();
   if (AC && AC.resume) {
     try { AC.resume(); } catch (e) {}
+  }
+  if (typeof screen !== 'undefined' && screen.orientation && screen.orientation.lock) {
+    try { screen.orientation.lock('landscape').catch(function () {}); } catch (e) {}
   }
   elStart.classList.add('hidden');
   elStart.style.display = 'none';
@@ -1066,6 +1315,13 @@ function bindInput() {
     if (c === 'ShiftLeft' || c === 'ShiftRight' || k === 'shift') keys.Shift = true;
     if (c === 'Digit1' || k === '1') switchWeapon('pistol');
     if (c === 'Digit2' || k === '2') switchWeapon('rifle');
+    if (c === 'Digit3' || k === '3') switchWeapon('shotgun');
+    if (c === 'KeyT' || k === 't') {
+      if (typeof DAY_NIGHT_SYSTEM !== 'undefined') {
+        var nextP = DAY_NIGHT_SYSTEM.cycleNextPhase();
+        msg('TIME: ' + nextP.toUpperCase(), 1.5, 'gold');
+      }
+    }
     if (c === 'KeyE' || k === 'e') {
       var nearD = getNearbyDoor(player.root.position.x, player.root.position.y, player.root.position.z, 3.2);
       if (nearD) {
@@ -1139,13 +1395,19 @@ function bindInput() {
         var max = rect.width / 2 - 12;
         if (d > max) { dx = dx / d * max; dy = dy / d * max; }
         elKnob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-        joyX = dx / max; joyY = dy / max;
+        var jx = dx / max, jy = dy / max;
+        if (Math.hypot(jx, jy) < 0.08) { jx = 0; jy = 0; }
+        joyTargetX = jx; joyTargetY = jy;
       } else if (e.pointerId === lookId) {
         var mx = e.clientX - lookLast[0], my = e.clientY - lookLast[1];
         lookLast = [e.clientX, e.clientY];
         if (state === 'playing') {
-          camYaw += mx * 0.0045;
-          camPitch = Math.max(-0.5, Math.min(1.25, camPitch + my * 0.0045));
+          lookFiltX = lookFiltX * 0.32 + mx * 0.68;
+          lookFiltY = lookFiltY * 0.32 + my * 0.68;
+          var touchSens = (typeof CONFIG !== 'undefined' && CONFIG.CAMERA && CONFIG.CAMERA.TOUCH_LOOK_SENSITIVITY)
+            ? CONFIG.CAMERA.TOUCH_LOOK_SENSITIVITY : 0.0038;
+          camYaw += lookFiltX * touchSens * (1 - adsAmt * 0.4);
+          camPitch = Math.max(-0.5, Math.min(1.25, camPitch + lookFiltY * touchSens * (1 - adsAmt * 0.4)));
         }
       }
       return;
@@ -1176,10 +1438,14 @@ function bindInput() {
   function releasePointer(e) {
     if (MOBILE) {
       if (e.pointerId === joyId) {
-        joyId = null; joyX = 0; joyY = 0;
+        joyId = null; joyX = 0; joyY = 0; joyTargetX = 0; joyTargetY = 0;
         elKnob.style.transform = 'translate(0,0)';
       }
-      if (e.pointerId === lookId) lookId = null;
+      if (e.pointerId === lookId) {
+        lookId = null;
+        lookFiltX = 0;
+        lookFiltY = 0;
+      }
     }
   }
   window.addEventListener('pointerup', releasePointer);
@@ -1189,7 +1455,7 @@ function bindInput() {
     if (e.button === 2) adsHeld = false;
   });
   window.addEventListener('wheel', function () {
-    if (state === 'playing') switchWeapon(player.cur === 'pistol' ? 'rifle' : 'pistol');
+    if (state === 'playing') cycleNextWeapon();
   }, { passive: true });
   canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -1223,10 +1489,18 @@ function bindInput() {
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
   }
-  if (MOBILE) {
+
+  if (btnFire) {
     pressBtn(btnFire, function () { if (state === 'playing') { triggerDown = true; fireLatch = false; } },
       function () { triggerDown = false; });
+  }
+  if (btnAds) {
+    pressBtn(btnAds, function () { adsHeld = !adsHeld; });
+  }
+  if (btnJump) {
     pressBtn(btnJump, function () { wantJump = true; });
+  }
+  if (btnDoor) {
     pressBtn(btnDoor, function () {
       var nearD = getNearbyDoor(player.root.position.x, player.root.position.y, player.root.position.z, 3.4);
       if (nearD) {
@@ -1234,7 +1508,21 @@ function bindInput() {
         msg(nearD.open ? 'DOOR OPENED' : 'DOOR CLOSED & LATCHED', 1.2, 'green');
       }
     });
-    pressBtn(btnSwap, function () { switchWeapon(player.cur === 'pistol' ? 'rifle' : 'pistol'); });
+  }
+  if (btnSwap) {
+    pressBtn(btnSwap, function () { cycleNextWeapon(); });
+  }
+
+  var elTime = document.getElementById('timeWrap');
+  if (elTime) {
+    elTime.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof DAY_NIGHT_SYSTEM !== 'undefined') {
+        var nextP = DAY_NIGHT_SYSTEM.cycleNextPhase();
+        msg('TIME: ' + nextP.toUpperCase(), 1.5, 'gold');
+      }
+    });
   }
 
   window.addEventListener('resize', function () { engine.resize(); });
@@ -1262,12 +1550,20 @@ buildPlayer();
   }
 })();
 
+if (typeof MODEL_LOADER !== 'undefined' && MODEL_LOADER.preloadAll) {
+  MODEL_LOADER.preloadAll(function (loaded, total, id, success) {
+    if (success) {
+      console.log('Loaded 3D .GLB Model:', id);
+    }
+  });
+}
+
 bindInput();
 elWpn.textContent = WPN.pistol.label;
 
 var _frameCount = 0;
 engine.runRenderLoop(function () {
-  var dt = Math.min(engine.getDeltaTime() / 1000, 0.05) || 0.016;
+  var dt = Math.min(engine.getDeltaTime() / 1000, 0.033) || 0.016;
   tNow += dt;
   updateWorldFX(dt);
   if (state === 'menu') {

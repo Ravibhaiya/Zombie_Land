@@ -1,6 +1,40 @@
 # 🧟 Zombie Land — Open World Survival 3D
 
-An open-world third-person 3D zombie survival game built using **Babylon.js** and WebGL.
+An open-world third-person 3D zombie survival game built using **Babylon.js** and WebGL, supporting `.glb` 3D model imports and optimized for Vercel deployment.
+
+---
+
+## 🚀 Deploy to Vercel
+
+This project is pre-configured with `vercel.json` for one-click deployment to Vercel:
+
+1. **Push your code to GitHub / GitLab**.
+2. **Import the repository into Vercel**.
+3. **Deploy** — Vercel will automatically configure the correct `model/gltf-binary` MIME types, global CORS headers, and immutable asset caching!
+
+Or deploy via the Vercel CLI:
+```bash
+npm i -g vercel
+vercel
+```
+
+---
+
+## 📦 Importing Custom 3D `.glb` Models
+
+You can drop your own realistic 3D `.glb` models into `assets/models/`:
+
+| Filename | Purpose | Height |
+|---|---|---|
+| `player_survivor.glb` | Custom Player Character Model | ~1.85m |
+| `zombie_walker.glb` | Walker Zombie Archetype | ~1.85m |
+| `zombie_runner.glb` | Fast Agile Runner Zombie | ~1.75m |
+| `zombie_brute.glb` | Giant Mutated Hulk Zombie | ~2.4m |
+| `weapon_pistol.glb` | 9mm Combat Pistol | ~0.35m |
+| `weapon_rifle.glb` | AR-15 / M4 Assault Rifle | ~0.85m |
+| `weapon_shotgun.glb` | 12-Gauge Tactical Shotgun | ~0.95m |
+
+> **Note**: If any `.glb` model is not present, the game automatically uses its ultra-realistic procedural 3D model with zero downtime or errors.
 
 ---
 
@@ -14,16 +48,17 @@ An open-world third-person 3D zombie survival game built using **Babylon.js** an
 - **Left Mouse Button (LMB)** — Fire Weapon
 - **Right Mouse Button (RMB)** — Aim Down Sights (ADS) for precision accuracy
 - **E** — Open / Close Doors
-- **1 / 2** or **Mouse Wheel** — Swap Weapon (Pistol ↔ Automatic Rifle)
+- **T** — Switch Time of Day (Morning ➔ Noon ➔ Dusk ➔ Midnight)
+- **1 / 2 / 3** or **Mouse Wheel** — Swap Weapon (Pistol ↔ Assault Rifle ↔ Shotgun)
 
-### Mobile & Touch Devices
+### Mobile & Touch Devices (Landscape Mode)
 - **Left Virtual Joystick** — Analog Character Movement
 - **Right Screen Drag** — Camera Aiming
 - **[FIRE]** — Shoot Weapon
-- **[ADS]** — Precision Aiming
+- **[AIM]** — Toggle Aim-Down-Sights Zoom
 - **[DOOR]** — Open / Close Doors
 - **[JUMP]** — Jump / Climb
-- **[SWAP]** — Swap Weapons
+- **[SWAP]** — Cycle Weapons (Pistol ➔ Rifle ➔ Shotgun)
 
 ---
 
@@ -42,13 +77,12 @@ An open-world third-person 3D zombie survival game built using **Babylon.js** an
    - **Ammo Crates (Supply Refills)** scattered on counters and floors.
    - Pickups automatically respawn after 45 seconds to encourage exploration.
 
-4. **3D Platforming & Rooftop Sniping**:
-   - Exterior fire escapes and ladders allow climbing to rooftop sniper vantage points.
-   - Rooftops feature sandbag cover and sniper crates for elevated defense.
+4. **Tactical Flashlight & Laser Sights**:
+   - Real-time weapon flashlight piercing through midnight mist.
+   - Active red laser sight on the Assault Rifle.
 
-5. **Headshot Mechanics**:
-   - Zombies take **1-shot instant kill** on headshots.
-   - Body shots stagger and damage zombies based on weapon caliber.
+5. **Headshot Decapitation & Visceral Gore**:
+   - Headshots trigger instant skull rupture with bone shards, meat chunks, and blood mist.
 
 ---
 
@@ -56,16 +90,21 @@ An open-world third-person 3D zombie survival game built using **Babylon.js** an
 
 ```
 Zombie land/
+├── vercel.json          # Vercel routing, CORS & .glb MIME type headers
 ├── index.html           # Main HTML entry point & UI overlays
 ├── style.css            # HUD, loading screen, crosshair & mobile UI styles
 ├── package.json         # Project metadata & test scripts
 ├── .editorconfig        # Formatting and indentation standards
 ├── ARCHITECTURE.md      # Technical architecture and extension guide
+├── README.md            # Documentation and deployment instructions
+├── assets/
+│   └── models/          # Drop custom .glb 3D models here
 ├── tests/
-│   └── game.test.js     # Automated headless test suite (run with `npm test`)
+│   └── game.test.js     # Automated test suite (run with `npm test`)
 └── js/
     ├── babylon.js       # Core 3D WebGL engine
     ├── config.js        # Centralized constants (physics, weapons, zombies, loot)
+    ├── models.js        # .GLB 3D model loader & normalization pipeline
     ├── world.js         # Map builder, collision system, materials, audio & lighting
     └── main.js          # Player controller, zombie AI, combat, camera & render loop
 ```
@@ -74,20 +113,8 @@ Zombie land/
 
 ## 🧪 Running Automated Tests
 
-To test the entire game engine, physics, collision detection, door mechanics, and headless 60-frame render loop:
-
 ```bash
 npm test
 # or
 node tests/game.test.js
 ```
-
----
-
-## 🛠️ How to Customize & Extend
-
-All gameplay tuning parameters are centralized in `js/config.js`:
-- **Add New Weapons**: Add an entry under `CONFIG.WEAPONS`.
-- **Tune Zombie Archetypes**: Adjust speed, damage, health, or scale under `CONFIG.ZOMBIES.TYPES`.
-- **Adjust Player Physics**: Tune jump height, walk/sprint speeds, or gravity in `CONFIG.PLAYER`.
-- **Graphics & Shadows**: Adjust shadow map sizes and particle pools in `CONFIG.GRAPHICS`.

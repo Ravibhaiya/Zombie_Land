@@ -2,6 +2,11 @@
 
 var canvas = document.getElementById('gameCanvas');
 
+var GFX_MOBILE = (('ontouchstart' in window) || ((typeof navigator !== 'undefined') && navigator.maxTouchPoints > 0)) ||
+  (window.innerWidth <= 1024 && window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+var GFX_CFG = (typeof CONFIG !== 'undefined' && CONFIG.GRAPHICS) ? CONFIG.GRAPHICS : {};
+var MAX_DPR = GFX_MOBILE ? (GFX_CFG.MAX_DPR_MOBILE || 1.5) : (GFX_CFG.MAX_DPR_DESKTOP || 2);
+
 var engine;
 try {
   engine = new BABYLON.Engine(canvas, true, { stencil: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
@@ -9,48 +14,138 @@ try {
   document.getElementById('startHint').textContent = 'WEBGL IS REQUIRED TO PLAY';
   throw e;
 }
-var BASE_SCALE = 1 / Math.min(window.devicePixelRatio || 1, 2);
+try { engine.enableOfflineSupport = false; } catch (e) {}
+var BASE_SCALE = 1 / Math.min(window.devicePixelRatio || 1, MAX_DPR);
 engine.setHardwareScalingLevel(BASE_SCALE);
 
+var W_CFG = (typeof CONFIG !== 'undefined' && CONFIG.WORLD) ? CONFIG.WORLD : {
+  CLEAR_COLOR: [0.03, 0.06, 0.05, 1],
+  FOG_COLOR: [0.04, 0.08, 0.06],
+  FOG_DENSITY: 0.0038
+};
+
 var scene = new BABYLON.Scene(engine);
-scene.clearColor = new BABYLON.Color4(0.52, 0.77, 0.93, 1);
+scene.clearColor = new BABYLON.Color4(W_CFG.CLEAR_COLOR[0], W_CFG.CLEAR_COLOR[1], W_CFG.CLEAR_COLOR[2], W_CFG.CLEAR_COLOR[3]);
 scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
-scene.fogColor = new BABYLON.Color3(0.74, 0.87, 0.95);
-scene.fogDensity = 0.0022;
+scene.fogColor = new BABYLON.Color3(W_CFG.FOG_COLOR[0], W_CFG.FOG_COLOR[1], W_CFG.FOG_COLOR[2]);
+scene.fogDensity = W_CFG.FOG_DENSITY;
 scene.skipPointerMovePicking = true;
+scene.constantlyUpdateMeshUnderPointer = false;
+scene.autoClear = true;
+scene.blockfreeActiveMeshesAndRenderingGroups = false;
 
 var camera = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(0, 40, -90), scene);
-camera.minZ = 0.2;
+camera.minZ = 0.18;
 camera.maxZ = 1600;
-camera.fov = 0.9;
+camera.fov = (typeof CONFIG !== 'undefined' && CONFIG.CAMERA && CONFIG.CAMERA.BASE_FOV) ? CONFIG.CAMERA.BASE_FOV : 0.86;
+camera.inertia = 0;
+camera.angularSensibility = 2000;
 
+// Ambient Pale Moonlight & Atmospheric Horror Lighting
 var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0.15, 1, 0.1), scene);
-hemi.intensity = 0.82;
-hemi.diffuse = new BABYLON.Color3(0.88, 0.94, 0.92);
-hemi.groundColor = new BABYLON.Color3(0.44, 0.54, 0.40);
+hemi.intensity = 0.35;
+hemi.diffuse = new BABYLON.Color3(0.18, 0.26, 0.24);
+hemi.groundColor = new BABYLON.Color3(0.04, 0.06, 0.05);
 hemi.specular = BABYLON.Color3.Black();
 
-var sunLight = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-0.45, -0.85, 0.35), scene);
-sunLight.intensity = 0.88;
-sunLight.diffuse = new BABYLON.Color3(1, 0.97, 0.88);
-sunLight.specular = new BABYLON.Color3(0.08, 0.08, 0.06);
+var sunLight = new BABYLON.DirectionalLight('moon', new BABYLON.Vector3(-0.45, -0.85, 0.35), scene);
+sunLight.intensity = 0.48;
+sunLight.diffuse = new BABYLON.Color3(0.32, 0.44, 0.48);
+sunLight.specular = new BABYLON.Color3(0.18, 0.22, 0.24);
+sunLight.shadowMinZ = 2;
+sunLight.shadowMaxZ = 160;
+sunLight.autoUpdateExtends = true;
 
 // Glow layer for neon signs, safe rings, lanterns, and muzzle flash
 var glowLayer = null;
 try {
-  glowLayer = new BABYLON.GlowLayer('glow', scene, { mainTextureRatio: 0.25 });
-  glowLayer.intensity = 0.55;
+  var glowRatio = GFX_MOBILE ? 0.18 : (GFX_CFG.GLOW_TEXTURE_RATIO || 0.25);
+  glowLayer = new BABYLON.GlowLayer('glow', scene, { mainTextureRatio: glowRatio });
+  glowLayer.intensity = GFX_MOBILE ? (GFX_CFG.GLOW_INTENSITY_MOBILE || 0.45) : (GFX_CFG.GLOW_INTENSITY || 0.7);
 } catch (e) { glowLayer = null; }
 
-// Real-time Shadow Generator
+// Real-time Shadow Generator — PCF on desktop, blur ESM on mobile
 var shadowGen = null;
 try {
-  shadowGen = new BABYLON.ShadowGenerator(512, sunLight);
-  shadowGen.useBlurExponentialShadowMap = true;
-  shadowGen.blurKernel = 12;
-  shadowGen.bias = 0.001;
-  shadowGen.normalBias = 0.01;
+  var shadowSize = GFX_MOBILE ? (GFX_CFG.SHADOW_MAP_SIZE_MOBILE || 512) : (GFX_CFG.SHADOW_MAP_SIZE_DESKTOP || 1024);
+  shadowGen = new BABYLON.ShadowGenerator(shadowSize, sunLight);
+  if (!GFX_MOBILE && shadowGen.usePercentageCloserFiltering !== undefined) {
+    shadowGen.usePercentageCloserFiltering = true;
+    if (BABYLON.ShadowGenerator.QUALITY_MEDIUM !== undefined) {
+      shadowGen.filteringQuality = BABYLON.ShadowGenerator.QUALITY_MEDIUM;
+    }
+  } else {
+    shadowGen.useBlurExponentialShadowMap = true;
+    shadowGen.blurKernel = GFX_MOBILE ? 8 : (GFX_CFG.SHADOW_BLUR_KERNEL || 12);
+  }
+  shadowGen.bias = 0.0008;
+  shadowGen.normalBias = 0.02;
+  shadowGen.darkness = 0.32;
+  if (shadowGen.getShadowMap()) {
+    shadowGen.getShadowMap().refreshRate = GFX_MOBILE ? 2 : 1;
+  }
 } catch (e) { shadowGen = null; }
+
+// Cinematic post-process: ACES tone map, FXAA, vignette, bloom (desktop)
+var gfxPipeline = null;
+var UNFROZEN_MATS = [];
+function applyImageProcessing(ip, exposure) {
+  if (!ip) return;
+  ip.contrast = GFX_CFG.CONTRAST || 1.14;
+  ip.exposure = (exposure !== undefined) ? exposure : (GFX_CFG.EXPOSURE || 1.06);
+  ip.toneMappingEnabled = true;
+  if (BABYLON.ImageProcessingConfiguration) {
+    ip.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES ||
+      BABYLON.ImageProcessingConfiguration.TONEMAPPING_STANDARD;
+  }
+  ip.vignetteEnabled = true;
+  ip.vignetteWeight = GFX_CFG.VIGNETTE_WEIGHT || 1.28;
+  ip.vignetteStretch = 0.18;
+  ip.vignetteColor = new BABYLON.Color4(0.02, 0.03, 0.025, 0);
+}
+function initGraphicsPipeline() {
+  try {
+    scene.imageProcessingConfiguration.toneMappingEnabled = true;
+    applyImageProcessing(scene.imageProcessingConfiguration, GFX_CFG.EXPOSURE || 1.06);
+  } catch (e) {}
+  if (typeof BABYLON.DefaultRenderingPipeline !== 'function') return;
+  try {
+    var useHdr = !GFX_MOBILE && engine.webGLVersion >= 2;
+    gfxPipeline = new BABYLON.DefaultRenderingPipeline('gfx', useHdr, scene, [camera]);
+    gfxPipeline.fxaaEnabled = true;
+    gfxPipeline.samples = 1;
+    gfxPipeline.imageProcessingEnabled = true;
+    applyImageProcessing(gfxPipeline.imageProcessing, GFX_CFG.EXPOSURE || 1.06);
+    gfxPipeline.bloomEnabled = !GFX_MOBILE;
+    gfxPipeline.bloomScale = 0.5;
+    gfxPipeline.bloomKernel = 32;
+    gfxPipeline.bloomWeight = GFX_CFG.BLOOM_WEIGHT || 0.16;
+    gfxPipeline.bloomThreshold = 0.84;
+    gfxPipeline.sharpenEnabled = false;
+    gfxPipeline.grainEnabled = !GFX_MOBILE;
+    if (gfxPipeline.grain) {
+      gfxPipeline.grain.animated = true;
+      gfxPipeline.grain.intensity = 5.5;
+    }
+    gfxPipeline.chromaticAberrationEnabled = false;
+  } catch (e) {
+    gfxPipeline = null;
+    try {
+      new BABYLON.FxaaPostProcess('fxaa', 1.0, camera);
+    } catch (e2) {}
+  }
+}
+initGraphicsPipeline();
+
+function applyExposure(value) {
+  try {
+    if (gfxPipeline && gfxPipeline.imageProcessing) {
+      gfxPipeline.imageProcessing.exposure = value;
+    } else if (scene.imageProcessingConfiguration) {
+      scene.imageProcessingConfiguration.exposure = value;
+    }
+  } catch (e) {}
+}
 
 function castShadow(node) {
   if (!shadowGen || !node) return;
@@ -84,6 +179,171 @@ function removeShadow(node) {
 
 function V(x, y, z) { return new BABYLON.Vector3(x, y, z); }
 
+var DAY_NIGHT_SYSTEM = (function () {
+  function getCfg() {
+    var c = (typeof CONFIG !== 'undefined') ? CONFIG : (typeof window !== 'undefined' ? window.CONFIG : null);
+    return (c && c.DAY_NIGHT) ? c.DAY_NIGHT : null;
+  }
+
+  var cfgInit = getCfg();
+  var currentHour = (cfgInit && cfgInit.INITIAL_HOUR !== undefined) ? cfgInit.INITIAL_HOUR : 7.0;
+  var currentPhaseName = 'morning';
+  var cycleDuration = (cfgInit && cfgInit.CYCLE_DURATION_MINUTES) ? cfgInit.CYCLE_DURATION_MINUTES * 60 : 600;
+
+  var curClear = new BABYLON.Color4(0.62, 0.48, 0.42, 1);
+  var targetClear = new BABYLON.Color4(0.62, 0.48, 0.42, 1);
+  var curFog = new BABYLON.Color3(0.68, 0.58, 0.52);
+  var targetFog = new BABYLON.Color3(0.68, 0.58, 0.52);
+  var curSunDir = new BABYLON.Vector3(-0.75, -0.45, 0.35);
+  var targetSunDir = new BABYLON.Vector3(-0.75, -0.45, 0.35);
+  var curSunCol = new BABYLON.Color3(1.0, 0.82, 0.60);
+  var targetSunCol = new BABYLON.Color3(1.0, 0.82, 0.60);
+  var curSunInt = 0.88, targetSunInt = 0.88;
+  var curHemiCol = new BABYLON.Color3(0.65, 0.62, 0.58);
+  var targetHemiCol = new BABYLON.Color3(0.65, 0.62, 0.58);
+  var curHemiInt = 0.55, targetHemiInt = 0.55;
+  var curFogDens = 0.0022, targetFogDens = 0.0022;
+  var curLanternInt = 0.25, targetLanternInt = 0.25;
+  var curExposure = 1.06, targetExposure = 1.06;
+
+  var PHASES = ['morning', 'noon', 'dusk', 'night'];
+
+  function determinePhase(hour) {
+    if (hour >= 5.5 && hour < 10.0) return 'morning';
+    if (hour >= 10.0 && hour < 17.5) return 'noon';
+    if (hour >= 17.5 && hour < 21.0) return 'dusk';
+    return 'night';
+  }
+
+  function applyProfile(pName, instant) {
+    currentPhaseName = pName;
+    var cfg = getCfg();
+    if (!cfg || !cfg.PROFILES || !cfg.PROFILES[pName]) return;
+    var p = cfg.PROFILES[pName];
+
+    targetClear.set(p.clearColor[0], p.clearColor[1], p.clearColor[2], p.clearColor[3] || 1);
+    targetFog.set(p.fogColor[0], p.fogColor[1], p.fogColor[2]);
+    targetFogDens = p.fogDensity;
+    targetSunDir.set(p.sunDir[0], p.sunDir[1], p.sunDir[2]);
+    targetSunCol.set(p.sunColor[0], p.sunColor[1], p.sunColor[2]);
+    targetSunInt = p.sunIntensity;
+    targetHemiCol.set(p.hemiDiffuse[0], p.hemiDiffuse[1], p.hemiDiffuse[2]);
+    targetHemiInt = p.hemiIntensity;
+    targetLanternInt = p.lanternIntensity;
+    targetExposure = (p.exposure !== undefined) ? p.exposure : 1.06;
+
+    if (instant) {
+      curClear.copyFrom(targetClear);
+      curFog.copyFrom(targetFog);
+      curFogDens = targetFogDens;
+      curSunDir.copyFrom(targetSunDir);
+      curSunCol.copyFrom(targetSunCol);
+      curSunInt = targetSunInt;
+      curHemiCol.copyFrom(targetHemiCol);
+      curHemiInt = targetHemiInt;
+      curLanternInt = targetLanternInt;
+      curExposure = targetExposure;
+
+      scene.clearColor.copyFrom(curClear);
+      scene.fogColor.copyFrom(curFog);
+      scene.fogDensity = curFogDens;
+      sunLight.direction.copyFrom(curSunDir);
+      sunLight.diffuse.copyFrom(curSunCol);
+      sunLight.intensity = curSunInt;
+      hemi.diffuse.copyFrom(curHemiCol);
+      hemi.intensity = curHemiInt;
+      if (typeof skyMat !== 'undefined' && skyMat) {
+        skyMat.emissiveColor.copyFrom(curFog);
+      }
+      applyExposure(curExposure);
+    }
+  }
+
+  function update(dt) {
+    var cfg = getCfg();
+    if (!cfg || !cfg.ENABLED) return;
+    var hoursPerSec = 24 / cycleDuration;
+    currentHour = (currentHour + dt * hoursPerSec) % 24;
+
+    var newPhase = determinePhase(currentHour);
+    if (newPhase !== currentPhaseName) {
+      applyProfile(newPhase, false);
+    }
+
+    var k = Math.min(dt * 1.8, 1);
+    BABYLON.Color4.LerpToRef(scene.clearColor, targetClear, k, scene.clearColor);
+    BABYLON.Color3.LerpToRef(scene.fogColor, targetFog, k, scene.fogColor);
+    scene.fogDensity += (targetFogDens - scene.fogDensity) * k;
+
+    BABYLON.Vector3.LerpToRef(sunLight.direction, targetSunDir, k, sunLight.direction);
+    BABYLON.Color3.LerpToRef(sunLight.diffuse, targetSunCol, k, sunLight.diffuse);
+    sunLight.intensity += (targetSunInt - sunLight.intensity) * k;
+
+    BABYLON.Color3.LerpToRef(hemi.diffuse, targetHemiCol, k, hemi.diffuse);
+    hemi.intensity += (targetHemiInt - hemi.intensity) * k;
+
+    curLanternInt += (targetLanternInt - curLanternInt) * k;
+    curExposure += (targetExposure - curExposure) * k;
+    if (typeof skyMat !== 'undefined' && skyMat) {
+      skyMat.emissiveColor.copyFrom(scene.fogColor);
+    }
+    applyExposure(curExposure);
+  }
+
+  function setTimePhase(phaseName) {
+    var targets = {
+      morning: 7.0,
+      noon: 12.0,
+      dusk: 18.5,
+      night: 23.0
+    };
+    if (targets[phaseName] !== undefined) {
+      currentHour = targets[phaseName];
+      applyProfile(phaseName, true);
+    }
+  }
+
+  function cycleNextPhase() {
+    var idx = PHASES.indexOf(currentPhaseName);
+    var next = PHASES[(idx + 1) % PHASES.length];
+    setTimePhase(next);
+    return next;
+  }
+
+  function getTimeData() {
+    var h = Math.floor(currentHour);
+    var m = Math.floor((currentHour - h) * 60);
+    var hStr = (h < 10 ? '0' : '') + h;
+    var mStr = (m < 10 ? '0' : '') + m;
+    var cfg = getCfg();
+    var p = (cfg && cfg.PROFILES && cfg.PROFILES[currentPhaseName]) ? cfg.PROFILES[currentPhaseName] : { icon: '🌅', label: 'MORNING' };
+    return {
+      hour: currentHour,
+      timeString: hStr + ':' + mStr,
+      phase: currentPhaseName,
+      label: p.label,
+      icon: p.icon,
+      formatted: p.icon + ' ' + hStr + ':' + mStr + ' ' + p.label
+    };
+  }
+
+  // Initial setup
+  applyProfile(determinePhase(currentHour), true);
+
+  return {
+    update: update,
+    setTimePhase: setTimePhase,
+    cycleNextPhase: cycleNextPhase,
+    getTimeData: getTimeData,
+    getHour: function () { return currentHour; },
+    getPhase: function () { return currentPhaseName; },
+    getLanternIntensity: function () { return curLanternInt; }
+  };
+})();
+
+if (typeof window !== 'undefined') window.DAY_NIGHT_SYSTEM = DAY_NIGHT_SYSTEM;
+if (typeof global !== 'undefined') global.DAY_NIGHT_SYSTEM = DAY_NIGHT_SYSTEM;
+
 var seed = 20260825;
 function srnd() {
   seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
@@ -102,7 +362,9 @@ function mat(hex, o) {
   if (MATS[key]) return MATS[key];
   var m = new BABYLON.StandardMaterial('m' + key, scene);
   m.diffuseColor = BABYLON.Color3.FromHexString(hex);
-  m.specularColor = new BABYLON.Color3(0.06, 0.06, 0.06);
+  m.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+  m.specularPower = 48;
+  m.maxSimultaneousLights = GFX_MOBILE ? 4 : 6;
   if (o.e) m.emissiveColor = BABYLON.Color3.FromHexString(o.e);
   if (o.a !== undefined) m.alpha = o.a;
   ALL_MATS.push(m);
@@ -111,8 +373,10 @@ function mat(hex, o) {
 }
 var vcMat = new BABYLON.StandardMaterial('vc', scene);
 vcMat.diffuseColor = new BABYLON.Color3(1, 1, 1);
-vcMat.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+vcMat.specularColor = new BABYLON.Color3(0.11, 0.11, 0.11);
+vcMat.specularPower = 40;
 vcMat.useVertexColors = true;
+vcMat.maxSimultaneousLights = GFX_MOBILE ? 4 : 6;
 ALL_MATS.push(vcMat);
 
 function paint(mesh, hex) {
@@ -121,7 +385,13 @@ function paint(mesh, hex) {
   var c = BABYLON.Color3.FromHexString(hex);
   var arr = new Float32Array(n * 4);
   for (var i = 0; i < n; i++) {
-    arr[i * 4] = c.r; arr[i * 4 + 1] = c.g; arr[i * 4 + 2] = c.b; arr[i * 4 + 3] = 1;
+    var h = Math.sin(i * 12.9898 + n * 0.17) * 43758.5453;
+    h = h - Math.floor(h);
+    var v = 0.9 + h * 0.2;
+    arr[i * 4] = Math.min(1, c.r * v);
+    arr[i * 4 + 1] = Math.min(1, c.g * v);
+    arr[i * 4 + 2] = Math.min(1, c.b * v);
+    arr[i * 4 + 3] = 1;
   }
   mesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, arr);
   return mesh;
@@ -131,6 +401,7 @@ function mergePainted(list) {
   var m = BABYLON.Mesh.MergeMeshes(list, true, true, null, false, false);
   if (!m) return null;
   m.material = vcMat;
+  m.receiveShadows = true;
   m.freezeWorldMatrix();
   return m;
 }
@@ -515,8 +786,19 @@ function tone(type, f0, f1, dur, vol, delay) {
   o.start(t); o.stop(t + dur + 0.02);
 }
 function sfxShot(kind) {
-  if (kind === 'rifle') { noiseHit(2300, 0.09, 0.5); tone('square', 150, 55, 0.09, 0.22); }
-  else { noiseHit(2900, 0.13, 0.6); tone('square', 175, 50, 0.12, 0.3); }
+  if (kind === 'rifle') {
+    noiseHit(2300, 0.09, 0.5); tone('square', 150, 55, 0.09, 0.22);
+  } else if (kind === 'shotgun') {
+    noiseHit(3600, 0.22, 0.9); tone('sine', 110, 30, 0.28, 0.85); tone('square', 190, 45, 0.16, 0.45);
+  } else {
+    noiseHit(2900, 0.13, 0.6); tone('square', 175, 50, 0.12, 0.3);
+  }
+}
+function sfxPump() {
+  tone('square', 600, 350, 0.05, 0.18); noiseHit(1800, 0.04, 0.15);
+  setTimeout(function () {
+    tone('square', 420, 780, 0.06, 0.2); noiseHit(2200, 0.05, 0.18);
+  }, 220);
 }
 function sfxPop() { tone('sine', 270, 65, 0.2, 0.55); noiseHit(750, 0.16, 0.4); tone('square', 900, 200, 0.06, 0.12); }
 function sfxTick() { tone('square', 1400, 1100, 0.035, 0.1); }
@@ -555,6 +837,39 @@ function sfxPickup() {
   tone('sine', 520, 880, 0.1, 0.35);
   setTimeout(function () { tone('sine', 880, 1320, 0.14, 0.4); }, 75);
 }
+function sfxHeartbeat() {
+  if (!AC) return;
+  tone('sine', 70, 36, 0.14, 0.7);
+  setTimeout(function () {
+    if (AC) tone('sine', 58, 30, 0.18, 0.6);
+  }, 140);
+}
+function sfxZombieScreech() {
+  if (!AC) return;
+  var t = AC.currentTime;
+  var o = AC.createOscillator();
+  o.type = 'sawtooth';
+  var f = rand(700, 950);
+  o.frequency.setValueAtTime(f, t);
+  o.frequency.exponentialRampToValueAtTime(f * 0.42, t + 0.55);
+  var fl = AC.createBiquadFilter();
+  fl.type = 'bandpass'; fl.frequency.value = 1500; fl.Q.value = 2.5;
+  var g = AC.createGain();
+  g.gain.setValueAtTime(0.01, t);
+  g.gain.linearRampToValueAtTime(0.48, t + 0.08);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.58);
+  o.connect(fl); fl.connect(g); g.connect(masterG);
+  o.start(t); o.stop(t + 0.6);
+  noiseHit(2000, 0.3, 0.3, 'highpass');
+}
+function sfxBoneSnap() {
+  noiseHit(1200, 0.08, 0.55);
+  tone('square', 320, 80, 0.09, 0.4);
+}
+function sfxFlashlightClick() {
+  tone('square', 1800, 2400, 0.02, 0.15);
+  noiseHit(3200, 0.015, 0.1);
+}
 
 var POOLS = {
   blood: { items: [], grav: 15 },
@@ -563,25 +878,32 @@ var POOLS = {
   spark: { items: [], grav: 8 },
   wood: { items: [], grav: 10 },
   concrete: { items: [], grav: 12 },
-  shell: { items: [], grav: 18 }
+  shell: { items: [], grav: 18 },
+  shellRed: { items: [], grav: 18 },
+  bone: { items: [], grav: 14 },
+  meat: { items: [], grav: 16 }
 };
 (function () {
   var defs = [
-    ['blood', '#c62828'],
+    ['blood', '#b71c1c'],
     ['goo', '#79a83d'],
     ['dust', '#b7a98f'],
     ['spark', '#ffe082'],
     ['wood', '#8a6538'],
     ['concrete', '#9ca3af'],
-    ['shell', '#d4af37']
+    ['shell', '#d4af37'],
+    ['shellRed', '#c62828'],
+    ['bone', '#ded9cc'],
+    ['meat', '#4a0808']
   ];
-  var counts = { blood: 24, goo: 18, dust: 18, spark: 12, wood: 12, concrete: 12, shell: 10 };
+  var counts = { blood: 28, goo: 18, dust: 18, spark: 14, wood: 12, concrete: 12, shell: 12, shellRed: 10, bone: 16, meat: 16 };
   defs.forEach(function (def) {
-    var master = BABYLON.MeshBuilder.CreateBox('p_' + def[0], { size: def[0] === 'shell' ? 0.08 : 0.15 }, scene);
+    var isSh = def[0] === 'shell' || def[0] === 'shellRed';
+    var master = BABYLON.MeshBuilder.CreateBox('p_' + def[0], { size: isSh ? 0.09 : 0.15 }, scene);
     master.material = mat(def[1], { e: (def[0] === 'spark' || def[0] === 'shell') ? '#8a6d1f' : undefined });
     master.isVisible = false;
     for (var i = 0; i < counts[def[0]]; i++) {
-      var inst = master.createInstance('pi');
+      var inst = master.createInstance('pi_' + def[0]);
       inst.setEnabled(false);
       POOLS[def[0]].items.push({ m: inst, vx: 0, vy: 0, vz: 0, life: 0, size: 1 });
     }
@@ -630,6 +952,24 @@ function spawnShell(pos, dir) {
   }
 }
 
+function spawnShellRed(pos, dir) {
+  var pool = POOLS.shellRed;
+  for (var i = 0; i < pool.items.length; i++) {
+    var p = pool.items[i];
+    if (p.life > 0) continue;
+    p.life = 1.1;
+    p.size = 1;
+    p.m.position.copyFrom(pos);
+    p.vx = dir.x * rand(1.6, 2.8) + rand(-0.35, 0.35);
+    p.vy = rand(2.0, 3.6);
+    p.vz = dir.z * rand(1.6, 2.8) + rand(-0.35, 0.35);
+    p.m.scaling.set(0.8, 1.4, 0.8);
+    p.m.setEnabled(true);
+    setTimeout(sfxShell, rand(130, 260));
+    break;
+  }
+}
+
 function updParticles(dt) {
   for (var key in POOLS) {
     var pool = POOLS[key];
@@ -642,7 +982,10 @@ function updParticles(dt) {
       p.m.position.x += p.vx * dt;
       p.m.position.y += p.vy * dt;
       p.m.position.z += p.vz * dt;
-      var groundLvl = getGroundHeight(p.m.position.x, p.m.position.z, p.m.position.y + 0.1);
+      var groundLvl = 0;
+      if (!GFX_MOBILE || (i & 1) === 0) {
+        groundLvl = getGroundHeight(p.m.position.x, p.m.position.z, p.m.position.y + 0.1);
+      }
       if (p.m.position.y < groundLvl + 0.05) {
         p.m.position.y = groundLvl + 0.05;
         p.vy *= -0.3;
@@ -657,6 +1000,15 @@ function updParticles(dt) {
 
 var ROADS = [-150, -50, 50, 150];
 var ROAD_W = 12;
+
+function nearRoad(x, z) {
+  for (var ii = 0; ii < ROADS.length; ii++) {
+    if (Math.abs(x - ROADS[ii]) < ROAD_W / 2 + 1) return true;
+    if (Math.abs(z - ROADS[ii]) < ROAD_W / 2 + 1) return true;
+  }
+  return false;
+}
+
 var WALL_PAL = ['#cdb89a', '#bfc6ae', '#a9bcc4', '#c9a9a2', '#b8b0a2', '#cfc39f', '#aeb4bf', '#c4b8a0'];
 var ROOF_PAL = ['#8b8b93', '#7d7666', '#6d7a80'];
 var HOUSE_WALLS = ['#f2d8ac', '#ead9d2', '#cfe3d6', '#f2cfae', '#e6d9ef', '#d8e8c8'];
@@ -669,9 +1021,50 @@ var ringMats = [];
 var emblems = [];
 var clouds = [];
 
+function makeProcTexture(size, fn) {
+  try {
+    var dt = new BABYLON.DynamicTexture('pt' + size + Math.random(), { width: size, height: size }, scene, false);
+    var ctx = dt.getContext();
+    if (!ctx || !ctx.createImageData) return null;
+    var img = ctx.createImageData(size, size);
+    var d = img.data;
+    for (var y = 0; y < size; y++) {
+      for (var x = 0; x < size; x++) {
+        var col = fn(x, y, size);
+        var i = (y * size + x) * 4;
+        d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    dt.update(false);
+    dt.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
+    dt.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+    dt.anisotropicFilteringLevel = GFX_MOBILE ? 2 : 8;
+    return dt;
+  } catch (e) {
+    return null;
+  }
+}
+
 function buildGroundAndRoads() {
-  var ground = BABYLON.MeshBuilder.CreateGround('g', { width: 700, height: 700 }, scene);
-  ground.material = mat('#77c94f');
+  var ground = BABYLON.MeshBuilder.CreateGround('g', { width: 700, height: 700, subdivisions: GFX_MOBILE ? 1 : 4 }, scene);
+  var grassMat = mat('#77c94f');
+  grassMat.specularColor = new BABYLON.Color3(0.04, 0.05, 0.03);
+  grassMat.specularPower = 16;
+  var grassTex = makeProcTexture(GFX_MOBILE ? 128 : 256, function (x, y, size) {
+    var n = Math.sin(x * 0.19) * Math.cos(y * 0.17) + Math.sin((x * 3.1 + y * 2.4) * 0.09) * 0.55;
+    n += ((x * 13 + y * 7) % 11) / 11 * 0.4;
+    var t = 0.5 + 0.5 * Math.sin(n * 1.4);
+    var blade = ((x * 31 + y * 17) % 5) === 0 ? 18 : 0;
+    return [68 + t * 58 + blade, 118 + t * 86, 38 + t * 32];
+  });
+  if (grassTex) {
+    grassMat.diffuseTexture = grassTex;
+    grassTex.uScale = 42;
+    grassTex.vScale = 42;
+  }
+  ground.material = grassMat;
+  ground.receiveShadows = true;
   ground.freezeWorldMatrix();
 
   var patchList = [];
@@ -1649,7 +2042,29 @@ function buildRuins() {
   }
 }
 
+var skyDome = null;
+var skyMat = null;
 function buildSky() {
+  try {
+    skyDome = BABYLON.MeshBuilder.CreateSphere('skyDome', {
+      diameter: 1800,
+      segments: GFX_MOBILE ? 10 : 16,
+      sideOrientation: BABYLON.Mesh.BACKSIDE
+    }, scene);
+    skyMat = new BABYLON.StandardMaterial('skyMat', scene);
+    skyMat.diffuseColor = BABYLON.Color3.Black();
+    skyMat.specularColor = BABYLON.Color3.Black();
+    skyMat.emissiveColor = scene.fogColor.clone();
+    skyMat.disableLighting = true;
+    skyMat.backFaceCulling = false;
+    skyDome.material = skyMat;
+    skyDome.isPickable = false;
+    skyDome.infiniteDistance = true;
+    UNFROZEN_MATS.push(skyMat);
+  } catch (e) {
+    skyDome = null;
+    skyMat = null;
+  }
   for (var i = 0; i < 8; i++) {
     var parts = [];
     var n = 3 + Math.floor(srnd() * 2);
@@ -1685,12 +2100,33 @@ function buildSky() {
   }
 }
 
+function buildBloodDecals() {
+  var bloodParts = [];
+  var bloodColors = ['#4a0606', '#660b0b', '#3b0404', '#7a1010'];
+  for (var i = 0; i < 46; i++) {
+    var bx = sr(-260, 260), bz = sr(-260, 260);
+    if (nearRoad(bx, bz) || Math.hypot(bx, bz) < 22) {
+      var rad = sr(0.7, 1.8);
+      var col = bloodColors[Math.floor(srnd() * bloodColors.length)];
+      var bDisc = discR(rad, bx, bz, 0.025, col, 10);
+      bloodParts.push(bDisc);
+      for (var d = 0; d < 3; d++) {
+        var dx = bx + sr(-rad * 1.4, rad * 1.4);
+        var dz = bz + sr(-rad * 1.4, rad * 1.4);
+        bloodParts.push(discR(sr(0.12, 0.32), dx, dz, 0.028, col, 6));
+      }
+    }
+  }
+  mergePainted(bloodParts);
+}
+
 function buildWorld() {
   buildGroundAndRoads();
   treeMasters = buildTreeMasters();
   buildCentralPark();
   buildBlocks();
   buildRuins();
+  buildBloodDecals();
   scatterTrees();
   buildScatterMasters();
   buildStreetProps();
@@ -1705,6 +2141,8 @@ function freezeAllMaterials() {
   if (_matsFrozen) return;
   _matsFrozen = true;
   for (var i = 0; i < ALL_MATS.length; i++) {
+    if (UNFROZEN_MATS.indexOf(ALL_MATS[i]) >= 0) continue;
     try { ALL_MATS[i].freeze(); } catch (e) {}
   }
+  try { scene.blockMaterialDirtyMechanism = true; } catch (e) {}
 }
