@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Zombie Land — Open World Survival</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700;800&family=Luckiest+Guy&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,30 +18,74 @@
 
 <div id="loadingScreen">
   <div class="loadBox">
-    <div class="loadTitle">ZOMBIE LAND</div>
-    <div class="loadSubtitle">OPEN WORLD SURVIVAL</div>
+    <div class="loadLogoWrap">
+      <div class="loadTitle">ZOMBIE LAND</div>
+      <div class="loadSubtitle">★ OPEN WORLD 3D SURVIVAL ★</div>
+    </div>
     <div class="spinner"></div>
-    <div class="loadBarTrack"><div class="loadBarFill" id="loadProgress"></div></div>
+    <div class="loadBarTrack">
+      <div class="loadBarFill" id="loadProgress"></div>
+      <div class="barGlass"></div>
+    </div>
     <div class="loadStatus" id="loadStatus">Generating Open World & Survivor Houses...</div>
-    <div class="loadTip">💡 TIP: Zombies cannot open closed doors. Use houses to shelter, reload, and scavenge medkits!</div>
+    <div class="loadTip">💡 <strong>PRO TIP:</strong> Zombies cannot open closed doors! Close doors to stay safe!</div>
   </div>
 </div>
 
 <div id="rotateOverlay">
   <div class="rotateBox">
     <div class="rotateIcon">🔄</div>
-    <div class="rotateTitle">ROTATE DEVICE TO LANDSCAPE</div>
-    <div class="rotateSubtitle">Zombie Land is built for widescreen survival.<br>Please turn your phone horizontally to enter.</div>
+    <div class="rotateTitle">ROTATE TO LANDSCAPE!</div>
+    <div class="rotateSubtitle">Zombie Land is built for widescreen arcade survival.<br>Please turn your phone horizontally to play!</div>
   </div>
 </div>
 
 <div id="vignette"></div>
 
 <div id="hud">
-  <div id="hpWrap"><div id="hpLabel">HP</div><div id="hpBar"><div id="hpFill"></div></div></div>
-  <div id="timeWrap"><span id="timeIcon">🌅</span><span id="timeLabel">07:00 MORNING</span></div>
-  <div id="killsWrap"><span class="kTitle">KILLS</span><span id="killsVal">0</span></div>
-  <div id="wpnLabel">PISTOL</div>
+  <!-- Health Bar Widget -->
+  <div id="hpWrap">
+    <div class="hudBadgeIcon hpBadge">❤️</div>
+    <div class="hpBarBox">
+      <div id="hpBar">
+        <div id="hpFill"></div>
+        <div class="barGlass"></div>
+      </div>
+      <div id="hpNum"><span id="hpCur">100</span><span id="hpMax">/100</span></div>
+    </div>
+  </div>
+
+  <!-- Time of Day Pill -->
+  <div id="timeWrap" title="Click or press [T] to switch time">
+    <span id="timeIcon">🌅</span>
+    <span id="timeLabel">07:00 MORNING</span>
+    <span class="keyTip">[T]</span>
+  </div>
+
+  <!-- Kills Widget -->
+  <div id="killsWrap">
+    <div class="hudBadgeIcon skullBadge">💀</div>
+    <div class="killsInfo">
+      <span class="kTitle">KILLS</span>
+      <span id="killsVal">0</span>
+    </div>
+  </div>
+
+  <!-- Weapon Card & Slots -->
+  <div id="wpnWrap">
+    <div class="wpnCard">
+      <div class="wpnIconWrap" id="wpnIcon">🔫</div>
+      <div class="wpnDetail">
+        <div id="wpnLabel">PISTOL</div>
+        <div class="ammoText" id="ammoLabel">SEMI-AUTO • 9MM</div>
+      </div>
+    </div>
+    <div class="wpnSlots">
+      <div class="slot active" id="slotPistol" title="Press [1]">1 🔫</div>
+      <div class="slot" id="slotRifle" title="Press [2]">2 🎯</div>
+      <div class="slot" id="slotShotgun" title="Press [3]">3 💥</div>
+    </div>
+  </div>
 </div>
 
 <div id="crosshair">
@@ -52,23 +99,51 @@
 <div id="resumeHint">CLICK TO RESUME</div>
 
 <div id="deathOverlay">
-  <div class="bigRed">YOU DIED</div>
-  <div id="respawnText">Respawning in 3...</div>
+  <div class="deathBox">
+    <div class="deathSkull">💀</div>
+    <div class="bigRed">YOU GOT EATEN!</div>
+    <div id="respawnText">Respawning in 3...</div>
+    <div class="deathTip">💡 Headshots kill zombies instantly! Close doors to buy time!</div>
+  </div>
 </div>
 
 <div id="startOverlay">
-  <h1>ZOMBIE LAND</h1>
-  <p class="tagline">The city is lost. Nature took it back.<br>Every house is enterable — close doors to keep them out.<br>Only a HEADSHOT puts them down.</p>
-  <p class="startHint" id="startHint">CLICK TO ENTER THE CITY</p>
+  <div class="startBox">
+    <div class="titleLogo">
+      <span class="logoMain">ZOMBIE LAND</span>
+      <span class="logoSub">★ OPEN WORLD 3D SURVIVAL ★</span>
+    </div>
+    
+    <div class="controlCards">
+      <div class="cCard"><span class="cKey">W A S D</span><span class="cDesc">MOVE</span></div>
+      <div class="cCard"><span class="cKey">SHIFT</span><span class="cDesc">SPRINT</span></div>
+      <div class="cCard"><span class="cKey">SPACE</span><span class="cDesc">JUMP / CLIMB</span></div>
+      <div class="cCard"><span class="cKey">LMB</span><span class="cDesc">FIRE</span></div>
+      <div class="cCard"><span class="cKey">RMB</span><span class="cDesc">ZOOM AIM</span></div>
+      <div class="cCard"><span class="cKey">E</span><span class="cDesc">DOORS</span></div>
+      <div class="cCard"><span class="cKey">1 2 3</span><span class="cDesc">WEAPONS</span></div>
+      <div class="cCard"><span class="cKey">T</span><span class="cDesc">TIME OF DAY</span></div>
+    </div>
+
+    <div class="startNotice">
+      <span class="tipStar">⭐</span>
+      <span><strong>SURVIVAL RULE:</strong> Zombies can't open closed doors! Hide in houses & aim for the HEAD!</span>
+    </div>
+
+    <button class="btnCartoonPlay" id="startHint">
+      <span>ENTER THE CITY</span>
+      <span class="btnArrow">▶</span>
+    </button>
+  </div>
 </div>
 
 <div id="mobileUI">
   <div id="joy"><div id="joyKnob"></div></div>
-  <div id="btnFire" class="mbtn big">FIRE</div>
-  <div id="btnAds" class="mbtn">AIM</div>
-  <div id="btnJump" class="mbtn">JUMP</div>
-  <div id="btnDoor" class="mbtn">DOOR</div>
-  <div id="btnSwap" class="mbtn">SWAP</div>
+  <div id="btnFire" class="mbtn big"><span>🔥</span>FIRE</div>
+  <div id="btnAds" class="mbtn"><span>🎯</span>AIM</div>
+  <div id="btnJump" class="mbtn"><span>⬆️</span>JUMP</div>
+  <div id="btnDoor" class="mbtn"><span>🚪</span>DOOR</div>
+  <div id="btnSwap" class="mbtn"><span>🔄</span>SWAP</div>
 </div>
 
 <script src="js/babylon.js"></script>

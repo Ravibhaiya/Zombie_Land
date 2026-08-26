@@ -225,7 +225,21 @@ function switchWeapon(name) {
   player.gunDip = 1;
   sfxSwap();
   if (name === 'shotgun') setTimeout(sfxPump, 150);
-  elWpn.textContent = WPN[name].label;
+  if (elWpn) elWpn.textContent = WPN[name].label;
+
+  var wIcons = { pistol: '🔫', rifle: '🎯', shotgun: '💥' };
+  var wLabels = { pistol: 'SEMI-AUTO • 9MM', rifle: 'FULL-AUTO • 5.56', shotgun: '8-PELLET • 12GA' };
+  var elIcon = document.getElementById('wpnIcon');
+  var elAmmo = document.getElementById('ammoLabel');
+  if (elIcon) elIcon.textContent = wIcons[name] || '🔫';
+  if (elAmmo) elAmmo.textContent = wLabels[name] || '';
+
+  var slotP = document.getElementById('slotPistol');
+  var slotR = document.getElementById('slotRifle');
+  var slotS = document.getElementById('slotShotgun');
+  if (slotP) slotP.classList.toggle('active', name === 'pistol');
+  if (slotR) slotR.classList.toggle('active', name === 'rifle');
+  if (slotS) slotS.classList.toggle('active', name === 'shotgun');
 }
 function cycleNextWeapon() {
   var idx = WPN_ORDER.indexOf(player.cur);
@@ -464,7 +478,12 @@ function killZombie(z, pt) {
   burst(pt, 'meat', 8, 6, 1.2, 0.7, 0.3, 0.75);
   burst(pt, 'goo', 10, 7, 1.2, 0.8, 0.4, 1.2);
   kills++;
-  elKills.textContent = kills;
+  if (elKills) {
+    elKills.textContent = kills;
+    elKills.classList.remove('pop');
+    void elKills.offsetWidth;
+    elKills.classList.add('pop');
+  }
   var hs = ['HEADSHOT!', 'OBLITERATED!', 'SPLAT!', 'CRITICAL KILL!', 'DOWN!'];
   msg(hs[Math.floor(Math.random() * hs.length)], 1.2, 'hs gold');
   chFlash('hs', 220);
@@ -1228,6 +1247,8 @@ function updateCamera(dt) {
 function refreshHUD() {
   elHP.style.width = Math.max(0, player.hp) + '%';
   elHP.classList.toggle('hurt', player.hp < 35);
+  var elCurHP = document.getElementById('hpCur');
+  if (elCurHP) elCurHP.textContent = Math.max(0, Math.ceil(player.hp));
   var low = player.hp < 30 && state !== 'menu';
   elVig.classList.toggle('lowhp', low);
   if (!low && parseFloat(elVig.style.opacity || 0) === 0) {
@@ -1524,6 +1545,13 @@ function bindInput() {
       }
     });
   }
+
+  var slotP = document.getElementById('slotPistol');
+  var slotR = document.getElementById('slotRifle');
+  var slotS = document.getElementById('slotShotgun');
+  if (slotP) slotP.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); switchWeapon('pistol'); });
+  if (slotR) slotR.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); switchWeapon('rifle'); });
+  if (slotS) slotS.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); switchWeapon('shotgun'); });
 
   window.addEventListener('resize', function () { engine.resize(); });
   document.addEventListener('visibilitychange', function () {
