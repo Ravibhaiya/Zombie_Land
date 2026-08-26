@@ -46,6 +46,7 @@ test('Configuration: Required structure & valid bounds', () => {
 test('Vercel Config: Valid JSON, headers, and GLB MIME types', () => {
   const vercelRaw = fs.readFileSync(path.join(__dirname, '../vercel.json'), 'utf8');
   const vercel = JSON.parse(vercelRaw);
+  assert(vercel.outputDirectory === '.', 'vercel.json outputDirectory must be set to .');
   assert(vercel.headers && vercel.headers.length > 0, 'vercel.json must define headers');
   const glbRule = vercel.headers.find(h => h.source.includes('.glb'));
   assert(glbRule, 'Must contain header rule for .glb files');

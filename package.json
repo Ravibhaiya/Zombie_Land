@@ -6,8 +6,7 @@
   "scripts": {
     "test": "node tests/game.test.js",
     "start": "npx serve .",
-    "build": "echo 'Ready for Vercel static deployment'",
-    "vercel-build": "npm test"
+    "build": "node tests/game.test.js"
   },
   "keywords": [
     "babylonjs",
