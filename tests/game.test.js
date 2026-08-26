@@ -212,6 +212,27 @@ test('Main Game: Player, Zombies, Gunplay & 60-Frame Render Loop', () => {
   ctx.cycleNextWeapon();
   assert(ctx.player.cur === 'pistol', 'Cycle next weapon from shotgun should return to pistol');
 
+  // Test player respawn resets all movement flags
+  ctx.player.onLadder = true;
+  ctx.player.climbStep = 0.5;
+  ctx.player.sprinting = true;
+  ctx.adsHeld = true;
+  ctx.wantJump = true;
+  ctx.respawn();
+  assert(ctx.player.onLadder === false, 'Respawn must reset player.onLadder');
+  assert(ctx.player.climbStep === 0, 'Respawn must reset player.climbStep');
+  assert(ctx.player.sprinting === false, 'Respawn must reset player.sprinting');
+  assert(ctx.adsHeld === false, 'Respawn must reset adsHeld');
+  assert(ctx.wantJump === false, 'Respawn must reset wantJump');
+  assert(ctx.player.hp === 100, 'Respawn must restore player HP to 100');
+
+  // Test GlowLayer sky exclusion (prevents glowing sky issue)
+  if (ctx.glowLayer && ctx.glowLayer.customEmissiveColorSelector) {
+    const fakeResult = { set: (r, g, b, a) => { fakeResult.r = r; fakeResult.g = g; fakeResult.b = b; } };
+    ctx.glowLayer.customEmissiveColorSelector({ name: 'skyDome' }, null, null, fakeResult);
+    assert(fakeResult.r === 0 && fakeResult.g === 0 && fakeResult.b === 0, 'SkyDome must be zeroed out in GlowLayer');
+  }
+
   // Simulate 60 frames
   for (let i = 0; i < 60; i++) {
     ctx.scene.render();

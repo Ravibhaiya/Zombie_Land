@@ -40,20 +40,23 @@ var btnJump = document.getElementById('btnJump');
 var btnDoor = document.getElementById('btnDoor');
 var btnSwap = document.getElementById('btnSwap');
 
-elStartHint.textContent = MOBILE ? 'TAP TO ENTER THE CITY' : 'CLICK TO ENTER THE CITY';
+if (elStartHint) elStartHint.textContent = MOBILE ? 'TAP TO ENTER THE CITY' : 'CLICK TO ENTER THE CITY';
 
 // Dynamic Tactical Flashlight / Weapon Light
+var FL_CFG = (typeof CONFIG !== 'undefined' && CONFIG.FLASHLIGHT) ? CONFIG.FLASHLIGHT : {
+  RANGE: 35.0, ANGLE: 0.65, EXPONENT: 2.5, INTENSITY: 2.4, COLOR: [1.0, 0.96, 0.85]
+};
 var flashLight = new BABYLON.SpotLight(
   'playerFlashlight',
   new BABYLON.Vector3(0, 1.5, 0),
   new BABYLON.Vector3(0, 0, 1),
-  0.65,
-  2.5,
+  FL_CFG.ANGLE || 0.65,
+  FL_CFG.EXPONENT || 2.5,
   scene
 );
-flashLight.intensity = 2.4;
-flashLight.diffuse = new BABYLON.Color3(1.0, 0.96, 0.85);
-flashLight.range = 38;
+flashLight.intensity = FL_CFG.INTENSITY || 2.4;
+flashLight.diffuse = new BABYLON.Color3(FL_CFG.COLOR ? FL_CFG.COLOR[0] : 1.0, FL_CFG.COLOR ? FL_CFG.COLOR[1] : 0.96, FL_CFG.COLOR ? FL_CFG.COLOR[2] : 0.85);
+flashLight.range = FL_CFG.RANGE || 35.0;
 
 var tNow = 0;
 var state = 'menu';
@@ -96,22 +99,25 @@ var chTimers = {};
 var deathT = 0;
 
 function msg(text, dur, cls) {
+  if (!elMsg) return;
   elMsg.textContent = text;
   elMsg.className = cls || '';
   elMsg.style.opacity = 1;
   if (msgTimer) clearTimeout(msgTimer);
-  msgTimer = setTimeout(function () { elMsg.style.opacity = 0; }, (dur || 1.6) * 1000);
+  msgTimer = setTimeout(function () { if (elMsg) elMsg.style.opacity = 0; }, (dur || 1.6) * 1000);
 }
 function subMsg(text, dur) {
+  if (!elSub) return;
   elSub.textContent = text;
   elSub.style.opacity = 1;
   if (subTimer) clearTimeout(subTimer);
-  subTimer = setTimeout(function () { elSub.style.opacity = 0; }, (dur || 2.2) * 1000);
+  subTimer = setTimeout(function () { if (elSub) elSub.style.opacity = 0; }, (dur || 2.2) * 1000);
 }
 function chFlash(cls, dur) {
+  if (!elCH) return;
   elCH.classList.add(cls);
   if (chTimers[cls]) clearTimeout(chTimers[cls]);
-  chTimers[cls] = setTimeout(function () { elCH.classList.remove(cls); }, dur);
+  chTimers[cls] = setTimeout(function () { if (elCH) elCH.classList.remove(cls); }, dur);
 }
 
 var player = {
@@ -252,55 +258,55 @@ function buildPlayer() {
   var body = new BABYLON.TransformNode('playerBody', scene);
   body.parent = root;
 
-  // 1. Torso & Tactical MOLLE Chest Rig
-  box(0.58, 0.72, 0.36, 0, 1.2, 0, '#2d3d34', body);
-  box(0.62, 0.44, 0.4, 0, 1.22, 0, '#1f2922', body);
-  box(0.14, 0.18, 0.1, -0.16, 1.18, 0.23, '#2a382e', body);
-  box(0.14, 0.18, 0.1, 0, 1.18, 0.23, '#2a382e', body);
-  box(0.14, 0.18, 0.1, 0.16, 1.18, 0.23, '#2a382e', body);
-  box(0.1, 0.16, 0.08, -0.22, 1.5, 0.06, '#181b1d', body);
-  var ant = cyl(0.015, 0.015, 0.18, -0.22, 1.66, 0.06, '#111315', body, 4);
+  // 1. Torso & Cartoon Tactical Hero Chest Rig
+  box(0.58, 0.72, 0.36, 0, 1.2, 0, '#2563eb', body);
+  box(0.62, 0.44, 0.4, 0, 1.22, 0, '#1d4ed8', body);
+  box(0.14, 0.18, 0.1, -0.16, 1.18, 0.23, '#3b82f6', body);
+  box(0.14, 0.18, 0.1, 0, 1.18, 0.23, '#3b82f6', body);
+  box(0.14, 0.18, 0.1, 0.16, 1.18, 0.23, '#3b82f6', body);
+  box(0.1, 0.16, 0.08, -0.22, 1.5, 0.06, '#1e293b', body);
+  var ant = cyl(0.015, 0.015, 0.18, -0.22, 1.66, 0.06, '#0f172a', body, 4);
 
-  // 2. Rugged Survival Backpack & Rolled Bedroll
-  box(0.44, 0.54, 0.24, 0, 1.26, -0.28, '#3d3024', body);
-  var bedroll = cyl(0.16, 0.16, 0.46, 0, 1.58, -0.28, '#253528', body, 8);
+  // 2. Cartoon Survival Backpack & Bedroll
+  box(0.44, 0.54, 0.24, 0, 1.26, -0.28, '#f59e0b', body);
+  var bedroll = cyl(0.16, 0.16, 0.46, 0, 1.58, -0.28, '#10b981', body, 8);
   bedroll.rotation.z = Math.PI / 2;
-  box(0.12, 0.2, 0.12, -0.24, 1.22, -0.26, '#1f2620', body);
+  box(0.12, 0.2, 0.12, -0.24, 1.22, -0.26, '#d97706', body);
 
-  // 3. Head, Ballistic Cap & Headlamp
-  sph(0.5, 0, 1.78, 0, '#f0c49a', body, 12);
-  var cap = sph(0.5, 0, 1.87, -0.02, '#1f2822', body, 10);
+  // 3. Head, Cartoon Cap & Headlamp
+  sph(0.5, 0, 1.78, 0, '#fed7aa', body, 12);
+  var cap = sph(0.5, 0, 1.87, -0.02, '#ef4444', body, 10);
   cap.scaling.y = 0.55;
-  box(0.4, 0.06, 0.26, 0, 1.84, 0.24, '#1f2822', body);
-  var hLamp = box(0.12, 0.08, 0.08, 0, 1.86, 0.26, '#181a1c', body);
-  var hLens = cyl(0.035, 0.035, 0.02, 0, 1.86, 0.31, '#88eeff', body, 6);
+  box(0.4, 0.06, 0.26, 0, 1.84, 0.24, '#dc2626', body);
+  var hLamp = box(0.12, 0.08, 0.08, 0, 1.86, 0.26, '#1e293b', body);
+  var hLens = cyl(0.035, 0.035, 0.02, 0, 1.86, 0.31, '#38bdf8', body, 6);
   hLens.rotation.x = Math.PI / 2;
-  hLens.material = mat('#88eeff', { e: '#88eeff' });
+  hLens.material = mat('#38bdf8', { e: '#38bdf8' });
 
   sph(0.09, -0.1, 1.8, 0.21, '#ffffff', body, 7);
   sph(0.09, 0.1, 1.8, 0.21, '#ffffff', body, 7);
-  sph(0.045, -0.1, 1.8, 0.252, '#222222', body, 6);
-  sph(0.045, 0.1, 1.8, 0.252, '#222222', body, 6);
+  sph(0.045, -0.1, 1.8, 0.252, '#0f172a', body, 6);
+  sph(0.045, 0.1, 1.8, 0.252, '#0f172a', body, 6);
 
-  // 4. Arms with Fingerless Gloves & Rolled Sleeves
-  var armL = limb(body, -0.38, 1.44, 0, 0.17, 0.62, '#2d3d34');
-  var armR = limb(body, 0.38, 1.44, 0, 0.17, 0.62, '#2d3d34');
-  box(0.16, 0.12, 0.16, 0, -0.22, 0, '#f0c49a', armL.p);
-  box(0.16, 0.12, 0.16, 0, -0.22, 0, '#f0c49a', armR.p);
-  box(0.16, 0.14, 0.16, 0, -0.36, 0, '#1c1e20', armL.p);
-  box(0.16, 0.14, 0.16, 0, -0.36, 0, '#1c1e20', armR.p);
+  // 4. Arms with Cartoon Gloves
+  var armL = limb(body, -0.38, 1.44, 0, 0.17, 0.62, '#2563eb');
+  var armR = limb(body, 0.38, 1.44, 0, 0.17, 0.62, '#2563eb');
+  box(0.16, 0.12, 0.16, 0, -0.22, 0, '#fed7aa', armL.p);
+  box(0.16, 0.12, 0.16, 0, -0.22, 0, '#fed7aa', armR.p);
+  box(0.16, 0.14, 0.16, 0, -0.36, 0, '#1e293b', armL.p);
+  box(0.16, 0.14, 0.16, 0, -0.36, 0, '#1e293b', armR.p);
   armL.p.rotation.x = -1.32; armL.p.rotation.z = 0.42;
   armR.p.rotation.x = -1.2; armR.p.rotation.z = -0.1;
 
-  // 5. Tactical Pants, Drop-Leg Holster & Combat Boots
-  box(0.54, 0.22, 0.34, 0, 0.86, 0, '#222b25', body);
-  var legL = limb(body, -0.16, 0.82, 0, 0.2, 0.78, '#222b25');
-  var legR = limb(body, 0.16, 0.82, 0, 0.2, 0.78, '#222b25');
-  box(0.18, 0.16, 0.08, 0, -0.42, 0.11, '#151819', legL.p);
-  box(0.18, 0.16, 0.08, 0, -0.42, 0.11, '#151819', legR.p);
-  box(0.08, 0.18, 0.14, 0.12, -0.22, 0, '#141618', legR.p);
-  box(0.22, 0.16, 0.34, 0, -0.76, 0.06, '#18191b', legL.p);
-  box(0.22, 0.16, 0.34, 0, -0.76, 0.06, '#18191b', legR.p);
+  // 5. Cartoon Pants & Boots
+  box(0.54, 0.22, 0.34, 0, 0.86, 0, '#1e293b', body);
+  var legL = limb(body, -0.16, 0.82, 0, 0.2, 0.78, '#1e293b');
+  var legR = limb(body, 0.16, 0.82, 0, 0.2, 0.78, '#1e293b');
+  box(0.18, 0.16, 0.08, 0, -0.42, 0.11, '#0f172a', legL.p);
+  box(0.18, 0.16, 0.08, 0, -0.42, 0.11, '#0f172a', legR.p);
+  box(0.08, 0.18, 0.14, 0.12, -0.22, 0, '#0f172a', legR.p);
+  box(0.22, 0.16, 0.34, 0, -0.76, 0.06, '#0f172a', legL.p);
+  box(0.22, 0.16, 0.34, 0, -0.76, 0.06, '#0f172a', legR.p);
 
   player.root = root;
   player.body = body;
@@ -346,17 +352,18 @@ laserDot.material = laserMat;
 laserDot.isVisible = false;
 laserDot.isPickable = false;
 
-var ZSKINS = ['#3d4734', '#323d2e', '#453f36', '#2d3829', '#3e362e'];
-var ZSHIRTS = ['#3f3f4a', '#4a382e', '#2e4237', '#422e38', '#383e47'];
-var ZPANTS = ['#282e29', '#2e2b24', '#242930'];
+var ZSKINS = ['#84cc16', '#a3e635', '#4ade80', '#22c55e', '#65a30d'];
+var ZSHIRTS = ['#8b5cf6', '#ec4899', '#f97316', '#06b6d4', '#eab308'];
+var ZPANTS = ['#1e293b', '#334155', '#475569', '#312e81'];
+var Z_TYPES_CFG = (typeof CONFIG !== 'undefined' && CONFIG.ZOMBIES && CONFIG.ZOMBIES.TYPES) ? CONFIG.ZOMBIES.TYPES : null;
 var ZTYPES = {
-  walker: { scl: [0.95, 1.08], speed: [2.2, 3.0], sense: 38, dmg: [8, 11], thin: 1, armW: 0, eyeColor: '#ffbb00' },
-  runner: { scl: [0.88, 0.96], speed: [4.4, 5.2], sense: 46, dmg: [6, 8], thin: 0.78, armW: -0.03, eyeColor: '#ff2200' },
-  brute: { scl: [1.32, 1.48], speed: [1.7, 2.1], sense: 34, dmg: [16, 22], thin: 1.15, armW: 0.08, eyeColor: '#ff0055' }
+  walker: (Z_TYPES_CFG && Z_TYPES_CFG.walker) ? Object.assign({ eyeColor: '#facc15' }, Z_TYPES_CFG.walker) : { scl: [0.95, 1.08], speed: [2.2, 3.0], sense: 38, dmg: [8, 11], thin: 1, armW: 0, eyeColor: '#facc15' },
+  runner: (Z_TYPES_CFG && Z_TYPES_CFG.runner) ? Object.assign({ eyeColor: '#ef4444' }, Z_TYPES_CFG.runner) : { scl: [0.88, 0.96], speed: [4.4, 5.2], sense: 46, dmg: [6, 8], thin: 0.78, armW: -0.03, eyeColor: '#ef4444' },
+  brute: (Z_TYPES_CFG && Z_TYPES_CFG.brute) ? Object.assign({ eyeColor: '#ec4899' }, Z_TYPES_CFG.brute) : { scl: [1.28, 1.42], speed: [1.7, 2.1], sense: 34, dmg: [15, 20], thin: 1.08, armW: 0.05, eyeColor: '#ec4899' }
 };
 
 function spawnZombie(x, z, typeName, rise) {
-  var T = ZTYPES[typeName];
+  var T = ZTYPES[typeName] || ZTYPES.walker;
   var scl = rand(T.scl[0], T.scl[1]);
   var skin = ZSKINS[Math.floor(Math.random() * ZSKINS.length)];
   var shirt = ZSHIRTS[Math.floor(Math.random() * ZSHIRTS.length)];
@@ -365,46 +372,46 @@ function spawnZombie(x, z, typeName, rise) {
   var body = new BABYLON.TransformNode('', scene);
   body.parent = root;
 
-  // 1. Torso with Rotting Flesh & Tattered Shirts
+  // 1. Torso with Cartoon Tattered Shirt
   var torso = box(0.74, 0.92, 0.46, 0, 1.22, 0, shirt, body);
   box(0.52, 0.24, 0.48, 0, 0.84, 0, skin, body);
   box(0.62, 0.26, 0.42, 0, 0.78, 0, pants, body);
 
-  // 2. Exposed Skeletal Rib Cage & Gore
-  box(0.52, 0.05, 0.08, 0, 1.46, 0.24, '#d8d3c5', body);
-  box(0.56, 0.05, 0.08, 0, 1.34, 0.24, '#d8d3c5', body);
-  box(0.48, 0.05, 0.08, 0, 1.22, 0.24, '#d8d3c5', body);
-  box(0.12, 0.42, 0.06, 0, 1.32, 0.25, '#780c0c', body);
+  // 2. Cartoon Ribs & Slime
+  box(0.52, 0.05, 0.08, 0, 1.46, 0.24, '#ffffff', body);
+  box(0.56, 0.05, 0.08, 0, 1.34, 0.24, '#ffffff', body);
+  box(0.48, 0.05, 0.08, 0, 1.22, 0.24, '#ffffff', body);
+  box(0.12, 0.42, 0.06, 0, 1.32, 0.25, '#84cc16', body);
 
-  // 3. Head & Terrifying Facial Features
+  // 3. Head & Stylized Facial Features
   var head = sph(0.68, 0, 1.94, 0, skin, body, 10);
   head.rotation.z = rand(-0.14, 0.14);
   if (typeName === 'runner') head.rotation.x = 0.22;
 
-  // Glowing Infected Horror Eyes
+  // Glowing Cartoon Eyes
   var eyeL = sph(0.09, -0.16, 0.06, 0.32, T.eyeColor, head, 6);
   eyeL.material = mat(T.eyeColor, { e: T.eyeColor });
   var eyeR = sph(0.09, 0.16, 0.06, 0.32, T.eyeColor, head, 6);
   eyeR.material = mat(T.eyeColor, { e: T.eyeColor });
 
-  // Blood-Soaked Jaw & Exposed Teeth
-  box(0.36, 0.14, 0.14, 0, -0.18, 0.28, '#660808', head);
-  box(0.24, 0.04, 0.04, 0, -0.12, 0.34, '#f0ede0', head);
-  box(0.22, 0.04, 0.04, 0, -0.22, 0.34, '#f0ede0', head);
+  // Cartoon Slime Mouth
+  box(0.36, 0.14, 0.14, 0, -0.18, 0.28, '#15803d', head);
+  box(0.24, 0.04, 0.04, 0, -0.12, 0.34, '#ffffff', head);
+  box(0.22, 0.04, 0.04, 0, -0.22, 0.34, '#ffffff', head);
 
   var bandMat = new BABYLON.StandardMaterial('band' + Math.random(), scene);
-  bandMat.diffuseColor = BABYLON.Color3.FromHexString('#4a0808');
+  bandMat.diffuseColor = BABYLON.Color3.FromHexString('#7c3aed');
   bandMat.specularColor = BABYLON.Color3.Black();
-  var band = box(0.48, 0.14, 0.08, 0, 0.18, 0.3, '#4a0808', head);
+  var band = box(0.48, 0.14, 0.08, 0, 0.18, 0.3, '#7c3aed', head);
   band.material = bandMat;
 
-  // 4. Arms with Bloody Claws
+  // 4. Arms with Cartoon Claws
   var armL = limb(body, -0.48, 1.52, 0, 0.18 + T.armW, 0.68, skin);
   var armR = limb(body, 0.48, 1.52, 0, 0.18 + T.armW, 0.68, skin);
   armL.p.rotation.x = -1.32; armR.p.rotation.x = -1.32;
   armL.p.rotation.z = 0.12; armR.p.rotation.z = -0.12;
-  box(0.14, 0.18, 0.16, 0, -0.36, 0, '#660808', armL.p);
-  box(0.14, 0.18, 0.16, 0, -0.36, 0, '#660808', armR.p);
+  box(0.14, 0.18, 0.16, 0, -0.36, 0, '#16a34a', armL.p);
+  box(0.14, 0.18, 0.16, 0, -0.36, 0, '#16a34a', armR.p);
 
   // 5. Brute Hulking Bone Protrusions & Spikes
   if (typeName === 'brute') {
@@ -503,12 +510,14 @@ function damagePlayer(dmg, srcX, srcZ) {
   player.kb.z += dz / d * 5;
   shake = Math.max(shake, 0.5);
   sfxHurt();
-  elVig.classList.remove('lowhp');
-  elVig.style.transition = 'none';
-  elVig.style.opacity = 0.85;
-  void elVig.offsetWidth;
-  elVig.style.transition = 'opacity 0.45s ease-out';
-  elVig.style.opacity = 0;
+  if (elVig) {
+    elVig.classList.remove('lowhp');
+    elVig.style.transition = 'none';
+    elVig.style.opacity = 0.85;
+    void elVig.offsetWidth;
+    elVig.style.transition = 'opacity 0.45s ease-out';
+    elVig.style.opacity = 0;
+  }
   if (player.hp <= 0) {
     player.hp = 0;
     killPlayer();
@@ -519,7 +528,8 @@ function killPlayer() {
   state = 'dead';
   deathT = 3.2;
   triggerDown = false;
-  elDeath.classList.add('show');
+  adsHeld = false;
+  if (elDeath) elDeath.classList.add('show');
   for (var i = 0; i < ZOMBIES.length; i++) ZOMBIES[i].aggro = false;
 }
 
@@ -537,6 +547,12 @@ function respawn() {
   player.vx = 0; player.vz = 0;
   player.kb.x = 0; player.kb.z = 0;
   player.invuln = 2.5;
+  player.onLadder = false;
+  player.climbStep = 0;
+  player.sprinting = false;
+  player.grounded = true;
+  adsHeld = false;
+  wantJump = false;
   for (var i = 0; i < ZOMBIES.length; i++) {
     var z = ZOMBIES[i];
     if (z.state === 'dead') continue;
@@ -550,16 +566,22 @@ function respawn() {
       z.wt = null;
     }
   }
-  elDeath.classList.remove('show');
+  if (elDeath) elDeath.classList.remove('show');
   state = 'playing';
   msg('BACK IN ACTION', 1.4, 'gold');
 }
 
+var P_CFG = (typeof CONFIG !== 'undefined' && CONFIG.PLAYER) ? CONFIG.PLAYER : {
+  MAX_HP: 100, WALK_SPEED: 6.3, SPRINT_SPEED: 10.0, JUMP_VELOCITY: 8.6, GRAVITY: 24.0,
+  STEP_ASSIST_HEIGHT: 0.48, HEALTH_REGEN_DELAY: 5.0, HEALTH_REGEN_RATE: 9.0,
+  ACCELERATION_RATE: 14.0, KNOCKBACK_DAMPING: 6.0
+};
+
 function updatePlayer(dt) {
   var p = player;
   p.invuln -= dt;
-  if (tNow - p.lastDmg > 5 && p.hp < 100 && state === 'playing') {
-    p.hp = Math.min(100, p.hp + 9 * dt);
+  if (tNow - p.lastDmg > (P_CFG.HEALTH_REGEN_DELAY || 5.0) && p.hp < (P_CFG.MAX_HP || 100) && state === 'playing') {
+    p.hp = Math.min(P_CFG.MAX_HP || 100, p.hp + (P_CFG.HEALTH_REGEN_RATE || 9.0) * dt);
   }
   var ix = 0, iy = 0;
   if (state === 'playing') {
@@ -578,15 +600,15 @@ function updatePlayer(dt) {
   if (mag > 1) { ix /= mag; iy /= mag; }
   var sprint = (keys.Shift || keys.ShiftLeft || keys.ShiftRight || Math.hypot(joyX, joyY) > 0.85) && mag > 0.1;
   p.sprinting = sprint && state === 'playing';
-  var spd = sprint ? 10 : 6.3;
+  var spd = sprint ? (P_CFG.SPRINT_SPEED || 10.0) : (P_CFG.WALK_SPEED || 6.3);
   var fx = Math.sin(camYaw), fz = Math.cos(camYaw);
   var rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
   var wx = (fx * iy + rx * ix) * spd;
   var wz = (fz * iy + rz * ix) * spd;
-  var k = smooth(14, dt);
+  var k = smooth(P_CFG.ACCELERATION_RATE || 14.0, dt);
   p.vx += (wx - p.vx) * k;
   p.vz += (wz - p.vz) * k;
-  var kd = Math.exp(-6 * dt);
+  var kd = Math.exp(-(P_CFG.KNOCKBACK_DAMPING || 6.0) * dt);
   p.kb.x *= kd; p.kb.z *= kd;
   var pos = p.root.position;
   var nx = pos.x + (p.vx + p.kb.x) * dt;
@@ -694,13 +716,13 @@ function updatePlayer(dt) {
     var targetG = getGroundHeight(pos.x, pos.z, pos.y, 0.45);
     
     // Smooth step-up for curbs, porch steps, debris
-    if (p.grounded && targetG > pos.y && targetG - pos.y <= 0.48) {
+    if (p.grounded && targetG > pos.y && targetG - pos.y <= (P_CFG.STEP_ASSIST_HEIGHT || 0.48)) {
       pos.y += (targetG - pos.y) * smooth(24, dt);
     }
     
     // Jump
     if (wantJump && p.grounded && state === 'playing') {
-      p.vy = 8.6;
+      p.vy = P_CFG.JUMP_VELOCITY || 8.6;
       p.grounded = false;
       sfxStep();
     }
@@ -708,7 +730,7 @@ function updatePlayer(dt) {
     
     // Apply gravity
     if (!p.grounded || pos.y > targetG + 0.05) {
-      p.vy -= 24 * dt;
+      p.vy -= (P_CFG.GRAVITY || 24.0) * dt;
       pos.y += p.vy * dt;
     }
     
@@ -1016,6 +1038,7 @@ function director(dt) {
       }
     }
   }
+  var anyDespawned = false;
   for (var j = ZOMBIES.length - 1; j >= 0; j--) {
     var zz = ZOMBIES[j];
     if (zz.state === 'dead') continue;
@@ -1023,8 +1046,10 @@ function director(dt) {
     if (dd2 > 185) {
       disposeZombie(zz);
       ZOMBIES.splice(j, 1);
+      anyDespawned = true;
     }
   }
+  if (anyDespawned) rebuildHitLists();
   growlTimer -= dt;
   if (growlTimer <= 0) {
     growlTimer = rand(2, 4.5);
@@ -1153,7 +1178,7 @@ function updateCamera(dt) {
   var adsTarget = (adsHeld && state === 'playing') ? 1 : 0;
   adsAmt += (adsTarget - adsAmt) * smooth(12, dt);
   recoil *= Math.exp(-9 * dt);
-  elCH.classList.toggle('ads', adsAmt > 0.5);
+  if (elCH) elCH.classList.toggle('ads', adsAmt > 0.5);
   var baseFov = (typeof CONFIG !== 'undefined' && CONFIG.CAMERA && CONFIG.CAMERA.BASE_FOV) ? CONFIG.CAMERA.BASE_FOV : 0.86;
   var fovT = baseFov + (player.sprinting ? 0.05 : 0) - adsAmt * 0.33;
   camera.fov += (fovT - camera.fov) * smooth(10, dt);
@@ -1245,14 +1270,18 @@ function updateCamera(dt) {
 }
 
 function refreshHUD() {
-  elHP.style.width = Math.max(0, player.hp) + '%';
-  elHP.classList.toggle('hurt', player.hp < 35);
+  if (elHP) {
+    elHP.style.width = Math.max(0, player.hp) + '%';
+    elHP.classList.toggle('hurt', player.hp < 35);
+  }
   var elCurHP = document.getElementById('hpCur');
   if (elCurHP) elCurHP.textContent = Math.max(0, Math.ceil(player.hp));
   var low = player.hp < 30 && state !== 'menu';
-  elVig.classList.toggle('lowhp', low);
-  if (!low && parseFloat(elVig.style.opacity || 0) === 0) {
-    elVig.style.boxShadow = '';
+  if (elVig) {
+    elVig.classList.toggle('lowhp', low);
+    if (!low && parseFloat(elVig.style.opacity || 0) === 0) {
+      elVig.style.boxShadow = '';
+    }
   }
   if (typeof DAY_NIGHT_SYSTEM !== 'undefined' && DAY_NIGHT_SYSTEM.getTimeData) {
     var td = DAY_NIGHT_SYSTEM.getTimeData();
@@ -1604,7 +1633,7 @@ engine.runRenderLoop(function () {
     updateCamera(dt);
     if (state === 'dead') {
       deathT -= dt;
-      elDeathText.textContent = 'RESPAWNING IN ' + Math.ceil(Math.max(deathT, 0)) + '...';
+      if (elDeathText) elDeathText.textContent = 'RESPAWNING IN ' + Math.ceil(Math.max(deathT, 0)) + '...';
       if (deathT <= 0) respawn();
     }
   }

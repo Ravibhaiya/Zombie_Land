@@ -35,22 +35,22 @@ scene.autoClear = true;
 scene.blockfreeActiveMeshesAndRenderingGroups = false;
 
 var camera = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(0, 40, -90), scene);
-camera.minZ = 0.18;
-camera.maxZ = 1600;
+camera.minZ = (typeof CONFIG !== 'undefined' && CONFIG.CAMERA && CONFIG.CAMERA.MIN_Z) ? CONFIG.CAMERA.MIN_Z : 0.2;
+camera.maxZ = (typeof CONFIG !== 'undefined' && CONFIG.CAMERA && CONFIG.CAMERA.MAX_Z) ? CONFIG.CAMERA.MAX_Z : 1600;
 camera.fov = (typeof CONFIG !== 'undefined' && CONFIG.CAMERA && CONFIG.CAMERA.BASE_FOV) ? CONFIG.CAMERA.BASE_FOV : 0.86;
 camera.inertia = 0;
 camera.angularSensibility = 2000;
 
-// Ambient Pale Moonlight & Atmospheric Horror Lighting
+// Bright Cartoon Ambient Lighting
 var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0.15, 1, 0.1), scene);
-hemi.intensity = 0.35;
-hemi.diffuse = new BABYLON.Color3(0.18, 0.26, 0.24);
-hemi.groundColor = new BABYLON.Color3(0.04, 0.06, 0.05);
+hemi.intensity = 0.65;
+hemi.diffuse = new BABYLON.Color3(0.85, 0.82, 0.75);
+hemi.groundColor = new BABYLON.Color3(0.45, 0.55, 0.35);
 hemi.specular = BABYLON.Color3.Black();
 
-var sunLight = new BABYLON.DirectionalLight('moon', new BABYLON.Vector3(-0.45, -0.85, 0.35), scene);
-sunLight.intensity = 0.48;
-sunLight.diffuse = new BABYLON.Color3(0.32, 0.44, 0.48);
+var sunLight = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-0.75, -0.45, 0.35), scene);
+sunLight.intensity = 1.05;
+sunLight.diffuse = new BABYLON.Color3(1.0, 0.90, 0.65);
 sunLight.specular = new BABYLON.Color3(0.18, 0.22, 0.24);
 sunLight.shadowMinZ = 2;
 sunLight.shadowMaxZ = 160;
@@ -61,7 +61,17 @@ var glowLayer = null;
 try {
   var glowRatio = GFX_MOBILE ? 0.18 : (GFX_CFG.GLOW_TEXTURE_RATIO || 0.25);
   glowLayer = new BABYLON.GlowLayer('glow', scene, { mainTextureRatio: glowRatio });
-  glowLayer.intensity = GFX_MOBILE ? (GFX_CFG.GLOW_INTENSITY_MOBILE || 0.45) : (GFX_CFG.GLOW_INTENSITY || 0.7);
+  glowLayer.intensity = GFX_MOBILE ? (GFX_CFG.GLOW_INTENSITY_MOBILE || 0.25) : (GFX_CFG.GLOW_INTENSITY || 0.35);
+  // Exclude sky dome, clouds, mountains, and ground to prevent any sky glowing
+  glowLayer.customEmissiveColorSelector = function (mesh, subMesh, material, result) {
+    if (!mesh || mesh.name === 'skyDome' || (mesh.name && mesh.name.indexOf('cl') === 0) || mesh.name === 'ground' || mesh.name === 'roads') {
+      result.set(0, 0, 0, 0);
+    } else if (material && material.emissiveColor) {
+      result.set(material.emissiveColor.r, material.emissiveColor.g, material.emissiveColor.b, material.alpha !== undefined ? material.alpha : 1);
+    } else {
+      result.set(0, 0, 0, 0);
+    }
+  };
 } catch (e) { glowLayer = null; }
 
 // Real-time Shadow Generator — PCF on desktop, blur ESM on mobile
@@ -80,33 +90,33 @@ try {
   }
   shadowGen.bias = 0.0008;
   shadowGen.normalBias = 0.02;
-  shadowGen.darkness = 0.32;
+  shadowGen.darkness = 0.28;
   if (shadowGen.getShadowMap()) {
     shadowGen.getShadowMap().refreshRate = GFX_MOBILE ? 2 : 1;
   }
 } catch (e) { shadowGen = null; }
 
-// Cinematic post-process: ACES tone map, FXAA, vignette, bloom (desktop)
+// Cartoon post-process: ACES tone map, clean soft vignette, subtle bloom
 var gfxPipeline = null;
 var UNFROZEN_MATS = [];
 function applyImageProcessing(ip, exposure) {
   if (!ip) return;
-  ip.contrast = GFX_CFG.CONTRAST || 1.14;
-  ip.exposure = (exposure !== undefined) ? exposure : (GFX_CFG.EXPOSURE || 1.06);
+  ip.contrast = GFX_CFG.CONTRAST || 1.08;
+  ip.exposure = (exposure !== undefined) ? exposure : (GFX_CFG.EXPOSURE || 1.04);
   ip.toneMappingEnabled = true;
   if (BABYLON.ImageProcessingConfiguration) {
     ip.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES ||
       BABYLON.ImageProcessingConfiguration.TONEMAPPING_STANDARD;
   }
   ip.vignetteEnabled = true;
-  ip.vignetteWeight = GFX_CFG.VIGNETTE_WEIGHT || 1.28;
-  ip.vignetteStretch = 0.18;
-  ip.vignetteColor = new BABYLON.Color4(0.02, 0.03, 0.025, 0);
+  ip.vignetteWeight = GFX_CFG.VIGNETTE_WEIGHT || 0.6;
+  ip.vignetteStretch = 0.22;
+  ip.vignetteColor = new BABYLON.Color4(0.01, 0.02, 0.04, 0);
 }
 function initGraphicsPipeline() {
   try {
     scene.imageProcessingConfiguration.toneMappingEnabled = true;
-    applyImageProcessing(scene.imageProcessingConfiguration, GFX_CFG.EXPOSURE || 1.06);
+    applyImageProcessing(scene.imageProcessingConfiguration, GFX_CFG.EXPOSURE || 1.04);
   } catch (e) {}
   if (typeof BABYLON.DefaultRenderingPipeline !== 'function') return;
   try {
@@ -115,18 +125,14 @@ function initGraphicsPipeline() {
     gfxPipeline.fxaaEnabled = true;
     gfxPipeline.samples = 1;
     gfxPipeline.imageProcessingEnabled = true;
-    applyImageProcessing(gfxPipeline.imageProcessing, GFX_CFG.EXPOSURE || 1.06);
+    applyImageProcessing(gfxPipeline.imageProcessing, GFX_CFG.EXPOSURE || 1.04);
     gfxPipeline.bloomEnabled = !GFX_MOBILE;
     gfxPipeline.bloomScale = 0.5;
     gfxPipeline.bloomKernel = 32;
-    gfxPipeline.bloomWeight = GFX_CFG.BLOOM_WEIGHT || 0.16;
-    gfxPipeline.bloomThreshold = 0.84;
+    gfxPipeline.bloomWeight = GFX_CFG.BLOOM_WEIGHT || 0.08;
+    gfxPipeline.bloomThreshold = 0.92;
     gfxPipeline.sharpenEnabled = false;
-    gfxPipeline.grainEnabled = !GFX_MOBILE;
-    if (gfxPipeline.grain) {
-      gfxPipeline.grain.animated = true;
-      gfxPipeline.grain.intensity = 5.5;
-    }
+    gfxPipeline.grainEnabled = false;
     gfxPipeline.chromaticAberrationEnabled = false;
   } catch (e) {
     gfxPipeline = null;
@@ -253,7 +259,7 @@ var DAY_NIGHT_SYSTEM = (function () {
       hemi.diffuse.copyFrom(curHemiCol);
       hemi.intensity = curHemiInt;
       if (typeof skyMat !== 'undefined' && skyMat) {
-        skyMat.emissiveColor.copyFrom(curFog);
+        skyMat.emissiveColor.set(curClear.r, curClear.g, curClear.b);
       }
       applyExposure(curExposure);
     }
@@ -276,6 +282,7 @@ var DAY_NIGHT_SYSTEM = (function () {
     scene.fogDensity += (targetFogDens - scene.fogDensity) * k;
 
     BABYLON.Vector3.LerpToRef(sunLight.direction, targetSunDir, k, sunLight.direction);
+    sunLight.direction.normalize();
     BABYLON.Color3.LerpToRef(sunLight.diffuse, targetSunCol, k, sunLight.diffuse);
     sunLight.intensity += (targetSunInt - sunLight.intensity) * k;
 
@@ -285,7 +292,7 @@ var DAY_NIGHT_SYSTEM = (function () {
     curLanternInt += (targetLanternInt - curLanternInt) * k;
     curExposure += (targetExposure - curExposure) * k;
     if (typeof skyMat !== 'undefined' && skyMat) {
-      skyMat.emissiveColor.copyFrom(scene.fogColor);
+      skyMat.emissiveColor.set(scene.clearColor.r, scene.clearColor.g, scene.clearColor.b);
     }
     applyExposure(curExposure);
   }
@@ -632,10 +639,11 @@ function resolve3DCollisions(px, py, pz, r, height, isZombie) {
       var cdx = x - c.x, cdz = z - c.z;
       var rr = c.r + r;
       var cd2 = cdx * cdx + cdz * cdz;
-      if (cd2 < rr * rr && cd2 > 1e-6) {
+      if (cd2 < rr * rr) {
+        if (cd2 < 1e-6) { cdx = 1; cdz = 0; cd2 = 1; }
         var cd = Math.sqrt(cd2);
-        x = c.x + cdx / cd * rr;
-        z = c.z + cdz / cd * rr;
+        x = c.x + (cdx / cd) * rr;
+        z = c.z + (cdz / cd) * rr;
       }
     }
   }
@@ -674,9 +682,11 @@ function resolveCircles(px, pz, r) {
     var dx = x - c.x, dz = z - c.z;
     var rr = c.r + r;
     var d2 = dx * dx + dz * dz;
-    if (d2 < rr * rr && d2 > 1e-6) {
+    if (d2 < rr * rr) {
+      if (d2 < 1e-6) { dx = 1; dz = 0; d2 = 1; }
       var d = Math.sqrt(d2);
-      x = c.x + dx / d * rr; z = c.z + dz / d * rr;
+      x = c.x + (dx / d) * rr;
+      z = c.z + (dz / d) * rr;
     }
   }
   return [x, z];
@@ -692,8 +702,10 @@ function clampSafeOut(px, pz, r) {
     var rr = s.r + r;
     var d2 = dx * dx + dz * dz;
     if (d2 < rr * rr) {
-      var d = Math.max(Math.sqrt(d2), 0.001);
-      x = s.x + dx / d * rr; z = s.z + dz / d * rr;
+      if (d2 < 1e-6) { dx = 1; dz = 0; d2 = 1; }
+      var d = Math.sqrt(d2);
+      x = s.x + (dx / d) * rr;
+      z = s.z + (dz / d) * rr;
       pushed = true;
     }
   }
@@ -885,16 +897,16 @@ var POOLS = {
 };
 (function () {
   var defs = [
-    ['blood', '#b71c1c'],
-    ['goo', '#79a83d'],
-    ['dust', '#b7a98f'],
-    ['spark', '#ffe082'],
-    ['wood', '#8a6538'],
-    ['concrete', '#9ca3af'],
-    ['shell', '#d4af37'],
-    ['shellRed', '#c62828'],
-    ['bone', '#ded9cc'],
-    ['meat', '#4a0808']
+    ['blood', '#22c55e'],
+    ['goo', '#4ade80'],
+    ['dust', '#fde047'],
+    ['spark', '#facc15'],
+    ['wood', '#ea580c'],
+    ['concrete', '#94a3b8'],
+    ['shell', '#facc15'],
+    ['shellRed', '#ef4444'],
+    ['bone', '#ffffff'],
+    ['meat', '#a855f7']
   ];
   var counts = { blood: 28, goo: 18, dust: 18, spark: 14, wood: 12, concrete: 12, shell: 12, shellRed: 10, bone: 16, meat: 16 };
   defs.forEach(function (def) {
@@ -1176,30 +1188,30 @@ function buildBuilding(cx, cz, w, dd, h, ry) {
   parts.push(box(fwW, h, 0.35, -w / 2 + fwW / 2, h / 2, dd / 2 - 0.175, wallHex, root));
   parts.push(box(fwW, h, 0.35, w / 2 - fwW / 2, h / 2, dd / 2 - 0.175, wallHex, root));
   // Front door lintel (above door)
-  parts.push(box(doorW + 0.2, h - doorH, 0.38, 0, doorH + (h - doorH) / 2, dd / 2 - 0.175, '#4a3b2f', root));
+  parts.push(box(doorW + 0.2, h - doorH, 0.38, 0, doorH + (h - doorH) / 2, dd / 2 - 0.175, '#ffffff', root));
   // Door frame side trims
-  parts.push(box(0.14, doorH, 0.4, -doorW / 2, doorH / 2, dd / 2 - 0.175, '#5c4839', root));
-  parts.push(box(0.14, doorH, 0.4, doorW / 2, doorH / 2, dd / 2 - 0.175, '#5c4839', root));
+  parts.push(box(0.14, doorH, 0.4, -doorW / 2, doorH / 2, dd / 2 - 0.175, '#ffffff', root));
+  parts.push(box(0.14, doorH, 0.4, doorW / 2, doorH / 2, dd / 2 - 0.175, '#ffffff', root));
 
-  // Windows with tinted glass
+  // Windows with glossy cartoon glass
   addWindows(parts, root, w, dd, h);
   if (srnd() < 0.65) {
     var ivyH = sr(2, Math.min(h - 2, 7));
-    parts.push(box(0.5, ivyH, 0.16, -w / 2 - 0.06, ivyH / 2 + 0.4, sr(-dd / 3, dd / 3), '#4e8f3a', root, sr(-0.2, 0.2)));
-    parts.push(box(0.16, ivyH * 0.7, 0.5, sr(-w / 3, w / 3), ivyH * 0.35 + 0.3, dd / 2 + 0.07, '#5da04a', root));
+    parts.push(box(0.5, ivyH, 0.16, -w / 2 - 0.06, ivyH / 2 + 0.4, sr(-dd / 3, dd / 3), '#22c55e', root, sr(-0.2, 0.2)));
+    parts.push(box(0.16, ivyH * 0.7, 0.5, sr(-w / 3, w / 3), ivyH * 0.35 + 0.3, dd / 2 + 0.07, '#4ade80', root));
   }
 
   // 3. Interior Living Room & Survivor Furniture
-  // Living room couch
-  parts.push(box(2.4, 0.75, 1.1, w / 4, 0.38, 0, '#42586b', root));
-  parts.push(box(2.4, 0.9, 0.3, w / 4, 0.65, 0.45, '#42586b', root));
+  // Cartoon living room couch
+  parts.push(box(2.4, 0.75, 1.1, w / 4, 0.38, 0, '#3b82f6', root));
+  parts.push(box(2.4, 0.9, 0.3, w / 4, 0.65, 0.45, '#2563eb', root));
   // Wooden dining / supply table
-  parts.push(box(2.2, 0.85, 1.3, -w / 4, 0.42, 0, '#5a402d', root));
-  parts.push(box(0.5, 0.85, 0.5, -w / 4, 0.42, -1.1, '#6c4e36', root));
+  parts.push(box(2.2, 0.85, 1.3, -w / 4, 0.42, 0, '#d97706', root));
+  parts.push(box(0.5, 0.85, 0.5, -w / 4, 0.42, -1.1, '#f59e0b', root));
   // Kitchen counter / storage shelf
-  parts.push(box(1.0, 0.95, dd / 2 - 1.2, -w / 2 + 0.7, 0.48, -dd / 4, '#8a7d6e', root));
+  parts.push(box(1.0, 0.95, dd / 2 - 1.2, -w / 2 + 0.7, 0.48, -dd / 4, '#e2e8f0', root));
   // Bookshelf / storage cupboard
-  parts.push(box(1.8, 2.2, 0.5, 0, 1.1, -dd / 2 + 0.45, '#4e3828', root));
+  parts.push(box(1.8, 2.2, 0.5, 0, 1.1, -dd / 2 + 0.45, '#92400e', root));
 
   // 4. Interior Ceiling Lamp with Warm Glow
   parts.push(cyl(0.3, 0.1, 0.3, 0, h - 0.3, 0, '#e8c878', root, 8));
@@ -1281,7 +1293,7 @@ function buildBuilding(cx, cz, w, dd, h, ry) {
 
   // 11. Register Rooftop Ladder
   var ladGlobal = rotPoint(ladX, ladZ, ry, cx, cz);
-  addLadder(ladGlobal[0], ladGlobal[1], 1.1, 0, roofTopH + 0.3, ry + Math.PI / 2, roofTopH + 0.3);
+  addLadder(ladGlobal[0], ladGlobal[1], 1.1, 0, roofTopH + 0.3, ry + Math.PI, roofTopH + 0.3);
 
   return { w: cw, d: cd };
 }
@@ -1344,27 +1356,27 @@ function buildSafeHouse(cx, cz, ry) {
   parts.push(box(fwW, h, 0.3, -w / 4 - 0.65, h / 2, dd / 2 - 0.15, wallHex, root));
   parts.push(box(fwW, h, 0.3, w / 4 + 0.65, h / 2, dd / 2 - 0.15, wallHex, root));
   // Front door lintel (top of door frame)
-  parts.push(box(2.8, 1.0, 0.36, 0, h - 0.5, dd / 2 - 0.15, '#4a3b2f', root));
+  parts.push(box(2.8, 1.0, 0.36, 0, h - 0.5, dd / 2 - 0.15, '#ffffff', root));
   // Decorative door trim
-  parts.push(box(0.18, 3.2, 0.38, -1.35, 1.6, dd / 2 - 0.15, '#5c4839', root));
-  parts.push(box(0.18, 3.2, 0.38, 1.35, 1.6, dd / 2 - 0.15, '#5c4839', root));
+  parts.push(box(0.18, 3.2, 0.38, -1.35, 1.6, dd / 2 - 0.15, '#ffffff', root));
+  parts.push(box(0.18, 3.2, 0.38, 1.35, 1.6, dd / 2 - 0.15, '#ffffff', root));
 
   // Windows with glass and shutters
   [-1, 1].forEach(function (s) {
-    parts.push(box(1.6, 1.4, 0.16, s * 3.2, 2.2, dd / 2 - 0.12, '#8ae2f5', root));
-    parts.push(box(1.9, 0.16, 0.22, s * 3.2, 2.95, dd / 2 - 0.10, '#f2ede0', root));
+    parts.push(box(1.6, 1.4, 0.16, s * 3.2, 2.2, dd / 2 - 0.12, '#38bdf8', root));
+    parts.push(box(1.9, 0.16, 0.22, s * 3.2, 2.95, dd / 2 - 0.10, '#ffffff', root));
     parts.push(box(0.35, 1.5, 0.12, s * 3.2 - s * 0.95, 2.2, dd / 2 - 0.08, roofHex, root));
     parts.push(box(0.35, 1.5, 0.12, s * 3.2 + s * 0.95, 2.2, dd / 2 - 0.08, roofHex, root));
   });
 
   // 3. Covered Front Porch ("Under the House")
   // Porch deck (elevated at y = 0.35)
-  parts.push(box(6.2, 0.35, 3.2, 0, 0.175, dd / 2 + 1.6, '#94724d', root));
+  parts.push(box(6.2, 0.35, 3.2, 0, 0.175, dd / 2 + 1.6, '#d97706', root));
   // Porch step (at y = 0.18)
-  parts.push(box(6.2, 0.18, 0.8, 0, 0.09, dd / 2 + 3.4, '#80603f', root));
+  parts.push(box(6.2, 0.18, 0.8, 0, 0.09, dd / 2 + 3.4, '#f59e0b', root));
   // Porch support columns
   [-2.7, 2.7].forEach(function (px) {
-    parts.push(cyl(0.22, 0.22, 3.0, px, 1.85, dd / 2 + 2.9, '#5f442f', root, 8));
+    parts.push(cyl(0.22, 0.22, 3.0, px, 1.85, dd / 2 + 2.9, '#d97706', root, 8));
   });
   // Porch overhead awning roof (y = 3.35, so headroom is ~3.0m underneath)
   var awn = box(6.6, 0.2, 3.4, 0, 3.35, dd / 2 + 1.7, roofHex, root);
@@ -1373,24 +1385,24 @@ function buildSafeHouse(cx, cz, ry) {
 
   // 4. Interior Shelter Furnishings & Warm Glow
   // Table
-  parts.push(box(2.0, 0.9, 1.2, -w / 2 + 1.6, 0.45, -dd / 2 + 1.5, '#634830', root));
+  parts.push(box(2.0, 0.9, 1.2, -w / 2 + 1.6, 0.45, -dd / 2 + 1.5, '#d97706', root));
   // First aid med-kit
-  parts.push(box(0.6, 0.26, 0.4, -w / 2 + 1.3, 0.9 + 0.13, -dd / 2 + 1.4, '#f8f8f8', root));
-  parts.push(box(0.35, 0.27, 0.1, -w / 2 + 1.3, 0.9 + 0.135, -dd / 2 + 1.4, '#d93b3b', root));
-  parts.push(box(0.1, 0.27, 0.35, -w / 2 + 1.3, 0.9 + 0.135, -dd / 2 + 1.4, '#d93b3b', root));
+  parts.push(box(0.6, 0.26, 0.4, -w / 2 + 1.3, 0.9 + 0.13, -dd / 2 + 1.4, '#ffffff', root));
+  parts.push(box(0.35, 0.27, 0.1, -w / 2 + 1.3, 0.9 + 0.135, -dd / 2 + 1.4, '#ef4444', root));
+  parts.push(box(0.1, 0.27, 0.35, -w / 2 + 1.3, 0.9 + 0.135, -dd / 2 + 1.4, '#ef4444', root));
   // Ammo crate & radio
-  parts.push(box(0.7, 0.45, 0.5, -w / 2 + 2.1, 0.9 + 0.225, -dd / 2 + 1.5, '#415239', root));
-  parts.push(box(0.45, 0.35, 0.28, -w / 2 + 1.7, 0.9 + 0.175, -dd / 2 + 1.3, '#2a332c', root));
-  parts.push(cyl(0.02, 0.01, 0.7, -w / 2 + 1.8, 0.9 + 0.6, -dd / 2 + 1.3, '#bbbbbb', root, 6));
+  parts.push(box(0.7, 0.45, 0.5, -w / 2 + 2.1, 0.9 + 0.225, -dd / 2 + 1.5, '#10b981', root));
+  parts.push(box(0.45, 0.35, 0.28, -w / 2 + 1.7, 0.9 + 0.175, -dd / 2 + 1.3, '#1e293b', root));
+  parts.push(cyl(0.02, 0.01, 0.7, -w / 2 + 1.8, 0.9 + 0.6, -dd / 2 + 1.3, '#cbd5e1', root, 6));
   // Lantern on table
-  parts.push(cyl(0.24, 0.18, 0.4, -w / 2 + 2.2, 0.9 + 0.2, -dd / 2 + 1.1, '#cf9a38', root, 8));
-  var lanBulb = sph(0.16, -w / 2 + 2.2, 0.9 + 0.2, -dd / 2 + 1.1, '#ffe082', root, 6);
-  lanBulb.material = mat('#ffe082', { e: '#ffaa33' });
+  parts.push(cyl(0.24, 0.18, 0.4, -w / 2 + 2.2, 0.9 + 0.2, -dd / 2 + 1.1, '#f59e0b', root, 8));
+  var lanBulb = sph(0.16, -w / 2 + 2.2, 0.9 + 0.2, -dd / 2 + 1.1, '#fef08a', root, 6);
+  lanBulb.material = mat('#fef08a', { e: '#fef08a' });
   parts.push(lanBulb);
 
   var lanWorldPos = rotPoint(-w / 2 + 2.2, -dd / 2 + 1.1, ry, cx, cz);
   var lanLight = new BABYLON.PointLight('lan' + cx, new BABYLON.Vector3(lanWorldPos[0], 1.4, lanWorldPos[1]), scene);
-  lanLight.diffuse = new BABYLON.Color3(1, 0.75, 0.38);
+  lanLight.diffuse = new BABYLON.Color3(1, 0.85, 0.52);
   lanLight.specular = new BABYLON.Color3(0.2, 0.15, 0.05);
   lanLight.range = 14;
   lanLight.intensity = 1.3;
@@ -1398,30 +1410,30 @@ function buildSafeHouse(cx, cz, ry) {
 
   // 5. Rooftop Platform & Lookout (y = 4.5m)
   // Rooftop floor slab
-  parts.push(box(w + 0.4, 0.3, dd + 0.4, 0, h + 0.15, 0, '#594a3d', root));
+  parts.push(box(w + 0.4, 0.3, dd + 0.4, 0, h + 0.15, 0, '#92400e', root));
   // Sandbag barricades along perimeter for sniper cover
-  parts.push(box(w - 0.8, 0.75, 0.5, 0, h + 0.65, dd / 2 - 0.25, '#c2b280', root)); // front
-  parts.push(box(0.5, 0.75, dd - 0.8, -w / 2 + 0.25, h + 0.65, 0, '#c2b280', root)); // left
-  parts.push(box(w - 0.8, 0.75, 0.5, 0, h + 0.65, -dd / 2 + 0.25, '#c2b280', root)); // back
+  parts.push(box(w - 0.8, 0.75, 0.5, 0, h + 0.65, dd / 2 - 0.25, '#fde047', root)); // front
+  parts.push(box(0.5, 0.75, dd - 0.8, -w / 2 + 0.25, h + 0.65, 0, '#fde047', root)); // left
+  parts.push(box(w - 0.8, 0.75, 0.5, 0, h + 0.65, -dd / 2 + 0.25, '#fde047', root)); // back
   // Right wall sandbags (with gap for ladder entry)
-  parts.push(box(0.5, 0.75, dd / 2 - 0.8, w / 2 - 0.25, h + 0.65, -dd / 4, '#c2b280', root));
-  parts.push(box(0.5, 0.75, dd / 4 - 0.4, w / 2 - 0.25, h + 0.65, dd / 2 - 0.6, '#c2b280', root));
+  parts.push(box(0.5, 0.75, dd / 2 - 0.8, w / 2 - 0.25, h + 0.65, -dd / 4, '#fde047', root));
+  parts.push(box(0.5, 0.75, dd / 4 - 0.4, w / 2 - 0.25, h + 0.65, dd / 2 - 0.6, '#fde047', root));
   // Rooftop lookout props
-  parts.push(cyl(0.08, 0.04, 4.0, -w / 2 + 1.2, h + 2.3, -dd / 2 + 1.2, '#cccccc', root, 6)); // Radio mast
-  var beacon = sph(0.3, -w / 2 + 1.2, h + 4.3, -dd / 2 + 1.2, '#ff3b30', root, 6);
-  beacon.material = mat('#ff3b30', { e: '#ff2020' });
+  parts.push(cyl(0.08, 0.04, 4.0, -w / 2 + 1.2, h + 2.3, -dd / 2 + 1.2, '#e2e8f0', root, 6)); // Radio mast
+  var beacon = sph(0.3, -w / 2 + 1.2, h + 4.3, -dd / 2 + 1.2, '#ef4444', root, 6);
+  beacon.material = mat('#ef4444', { e: '#ef4444' });
   parts.push(beacon);
-  parts.push(box(1.2, 0.7, 0.8, 0, h + 0.65, -dd / 2 + 1.2, '#3f4f38', root)); // Sniper crate
+  parts.push(box(1.2, 0.7, 0.8, 0, h + 0.65, -dd / 2 + 1.2, '#10b981', root)); // Sniper crate
 
   // 6. Exterior Ladder on Right Side
   var ladLocalX = w / 2 + 0.15;
   var ladLocalZ = dd / 4 - 0.2;
   // Side rails
-  parts.push(cyl(0.06, 0.06, 5.4, ladLocalX, 2.7, ladLocalZ - 0.35, '#444449', root, 6));
-  parts.push(cyl(0.06, 0.06, 5.4, ladLocalX, 2.7, ladLocalZ + 0.35, '#444449', root, 6));
+  parts.push(cyl(0.06, 0.06, 5.4, ladLocalX, 2.7, ladLocalZ - 0.35, '#1e293b', root, 6));
+  parts.push(cyl(0.06, 0.06, 5.4, ladLocalX, 2.7, ladLocalZ + 0.35, '#1e293b', root, 6));
   // Rungs
   for (var rg = 0.35; rg <= 4.5; rg += 0.32) {
-    parts.push(box(0.08, 0.05, 0.66, ladLocalX, rg, ladLocalZ, '#d49a34', root));
+    parts.push(box(0.08, 0.05, 0.66, ladLocalX, rg, ladLocalZ, '#f59e0b', root));
   }
 
   // Merge house meshes and add to occluders & shadow casters
@@ -1476,7 +1488,6 @@ function buildSafeHouse(cx, cz, ry) {
   // Register Interactive Front Door in Safehouse
   var doorPos = rotPoint(0, dd / 2 - 0.15, ry, cx, cz);
   addInteractiveDoor(doorPos[0], doorPos[1], 0, 2.6, 3.2, ry, true);
-
   // Register Scavengeable Loot in Safehouse
   var sLoot1 = rotPoint(-w / 2 + 1.3, -dd / 2 + 1.4, ry, cx, cz);
   addLoot('medkit', sLoot1[0], 0.95, sLoot1[1]);
@@ -1485,7 +1496,7 @@ function buildSafeHouse(cx, cz, ry) {
 
   // 8. Register Exterior Ladder
   var ladWorldPos = rotPoint(ladLocalX, ladLocalZ, ry, cx, cz);
-  addLadder(ladWorldPos[0], ladWorldPos[1], 1.1, 0, roofTopY, ry + Math.PI / 2, roofTopY);
+  addLadder(ladWorldPos[0], ladWorldPos[1], 1.1, 0, roofTopY, ry + Math.PI, roofTopY);
 
   // 9. Safe Zone Beacon & Rings
   var ringMat = new BABYLON.StandardMaterial('ringM' + cx, scene);
@@ -1502,55 +1513,60 @@ function buildSafeHouse(cx, cz, ry) {
   var fdMat = new BABYLON.StandardMaterial('fdm' + cx, scene);
   fdMat.emissiveColor = BABYLON.Color3.FromHexString('#59e3ff');
   fdMat.disableLighting = true;
-  fdMat.alpha = 0.06;
+  fdMat.alpha = 0.12;
   ALL_MATS.push(fdMat);
-  var floorDisc = BABYLON.MeshBuilder.CreateDisc('fd' + cx, { radius: SAFE_R, tessellation: 24 }, scene);
-  floorDisc.rotation.x = Math.PI / 2;
-  floorDisc.position.set(cx, 0.02, cz);
-  floorDisc.material = fdMat;
-  floorDisc.freezeWorldMatrix();
+  var fadeDisc = BABYLON.MeshBuilder.CreateDisc('fdd' + cx, { radius: SAFE_R, tessellation: 28 }, scene);
+  fadeDisc.position.set(cx, 0.05, cz);
+  fadeDisc.rotation.x = Math.PI / 2;
+  fadeDisc.material = fdMat;
+  fadeDisc.freezeWorldMatrix();
 
-  var beamMat = new BABYLON.StandardMaterial('bm' + cx, scene);
-  beamMat.emissiveColor = BABYLON.Color3.FromHexString('#8af0ff');
-  beamMat.disableLighting = true;
-  beamMat.alpha = 0.05;
-  ALL_MATS.push(beamMat);
-  var beam = BABYLON.MeshBuilder.CreateCylinder('beam' + cx, { diameter: SAFE_R * 1.9, height: 14, tessellation: 16 }, scene);
-  beam.position.set(cx, 7, cz);
-  beam.material = beamMat;
-  beam.freezeWorldMatrix();
-
-  var emb = new BABYLON.TransformNode('emb' + cx, scene);
+  // Emblem Floating Beacon
+  var emb = BABYLON.MeshBuilder.CreateCylinder('emb' + cx, { diameter: 1.8, height: 0.28, tessellation: 6 }, scene);
   emb.position.set(cx, 8.8, cz);
-  var tor = BABYLON.MeshBuilder.CreateTorus('et' + cx, { diameter: 1.9, thickness: 0.42, tessellation: 20 }, scene);
-  tor.parent = emb;
-  tor.material = mat('#ffc93f', { e: '#a87b12' });
-  var core = sph(0.75, 0, 0, 0, '#fff6d8', emb);
-  core.material = mat('#fff6d8', { e: '#bfa96f' });
+  var embM = new BABYLON.StandardMaterial('embm' + cx, scene);
+  embM.diffuseColor = BABYLON.Color3.FromHexString('#f59e0b');
+  embM.emissiveColor = BABYLON.Color3.FromHexString('#f59e0b');
+  emb.material = embM;
   emblems.push(emb);
 
+  // Dynamic warm lantern inside
+  var lantern = new BABYLON.PointLight('safeLantern' + cx, new BABYLON.Vector3(cx, 3.2, cz), scene);
+  lantern.diffuse = new BABYLON.Color3(1.0, 0.82, 0.52);
+  lantern.range = 22.0;
+  lantern.intensity = 1.6;
+  lanternLights.push(lantern);
   COL.safe.push({ x: cx, z: cz, r: SAFE_R });
+  return { w: rBoundW, d: rBoundD };
 }
 
-function buildVehicle(x, z, ry, type) {
-  var root = new BABYLON.TransformNode('', scene);
+function buildVehicle(x, z, ry) {
+  var root = new BABYLON.TransformNode('vehRoot', scene);
+  var col = CAR_COLORS[Math.floor(srnd() * CAR_COLORS.length)];
+  var vcMat = mat(col, { r: 0.25, m: 0.2 });
+
+  var isTruck = srnd() < 0.28;
+  var isVan = !isTruck && srnd() < 0.35;
+  var W = isTruck ? 2.6 : (isVan ? 2.3 : 2.0);
+  var L = isTruck ? 6.2 : (isVan ? 5.2 : 4.4);
+  var H = isTruck ? 1.9 : (isVan ? 1.6 : 1.15);
+
   root.position.set(x, 0, z);
   root.rotation.y = ry;
+
   var parts = [];
-  var colHex = CAR_COLORS[Math.floor(srnd() * CAR_COLORS.length)];
-  var L = 4.6, W = 2, H = 0.95;
-  if (type === 1) { L = 5.4; H = 1.5; }
-  if (type === 2) { L = 8.4; W = 2.4; H = 2.1; }
-  parts.push(box(W, H, L, 0, 0.55 + H / 2, 0, colHex, root));
-  if (type === 2) {
-    parts.push(box(W + 0.05, 0.85, L * 0.75, 0, 2.5, -L * 0.06, '#38bdf8', root));
+  // Chassis / Lower Body
+  parts.push(box(W, 0.65, L, 0, 0.58, 0, col, root));
+  // Cabin & Roof
+  if (isTruck) {
+    parts.push(box(W, H, L * 0.42, 0, 0.58 + H / 2, L * 0.2, col, root));
+    parts.push(box(W * 0.88, H * 0.82, L * 0.48, 0, 0.58 + H * 0.42, -L * 0.22, '#475569', root));
   } else {
-    var cabL = L * 0.45;
-    var cabZ = type === 3 ? L * 0.18 : -L * 0.05;
-    parts.push(box(W - 0.15, 0.85, cabL, 0, 0.55 + H + 0.32, cabZ, colHex, root));
-    parts.push(box(W - 0.3, 0.62, cabL - 0.3, 0, 0.55 + H + 0.36, cabZ, '#38bdf8', root));
-    if (type === 3) parts.push(box(W - 0.2, 0.5, L * 0.42, 0, 1, -L * 0.24, colHex, root));
+    parts.push(box(W * 0.94, H, L * 0.64, 0, 0.58 + H / 2, -L * 0.05, col, root));
   }
+  // Cartoon Sky-Blue Windows
+  parts.push(box(W * 0.96, H * 0.48, L * 0.32, 0, 0.72 + H / 2, isTruck ? L * 0.22 : 0, '#38bdf8', root));
+  // Wheels & Bumpers & Lights
   [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (wl) {
     var wheel = cyl(0.72, 0.72, 0.3, wl[0] * (W / 2 - 0.05), 0.42, wl[1] * L * 0.32, '#1e293b', root, 12);
     wheel.rotation.z = Math.PI / 2;
@@ -1572,19 +1588,18 @@ function buildVehicle(x, z, ry, type) {
   }
   root.dispose();
 
-  // Register vehicle roof as walkable platform & obstacle
+  // Register vehicle roof as walkable platform & 3D obstacle
   var vehTopY = 0.55 + H;
   var vcw = Math.abs(Math.cos(ry)) * W + Math.abs(Math.sin(ry)) * L;
   var vcd = Math.abs(Math.cos(ry)) * L + Math.abs(Math.sin(ry)) * W;
   addPlatform(x - vcw / 2, x + vcw / 2, z - vcd / 2, z + vcd / 2, vehTopY, 'vehicle', 'Vehicle Roof');
   addRotatedWall3D(x, z, W, L, 0, vehTopY, ry, 0.1);
-  addCircle(x, z, Math.max(L, W) * 0.42);
 }
 
 function buildTreeMasters() {
   function finish(parts) {
     var m = mergePainted(parts);
-    m.isVisible = false;
+    if (m) m.isVisible = false;
     return m;
   }
   // 1. Cartoon Fluffy Oak Tree (Cloud Canopy)
@@ -1748,32 +1763,24 @@ function buildScatterMasters() {
   flowerBufs.forEach(function (buf, bi) { thinSet(flowerMasters[bi], buf); });
 
   var bushCount = 0;
-  tries = 0;
-  while (bushCount < 90 && tries < 500) {
-    tries++;
-    var bx, bz;
-    if (srnd() < 0.5) {
-      bx = ROADS[Math.floor(srnd() * 4)] + (srnd() > 0.5 ? 1 : -1) * (ROAD_W / 2 + 3.4);
-      bz = sr(-280, 280);
-    } else {
-      bz = ROADS[Math.floor(srnd() * 4)] + (srnd() > 0.5 ? 1 : -1) * (ROAD_W / 2 + 3.4);
-      bx = sr(-280, 280);
+  if (bushMaster) {
+    for (var b = 0; b < 120; b++) {
+      var bx = sr(-260, 260), bz = sr(-260, 260);
+      if (nearRoad(bx, bz) || inSafePoint(bx, bz, 3)) continue;
+      var instB = bushMaster.createInstance('bush_' + bushCount);
+      instB.position.set(bx, 0, bz);
+      var bs = sr(0.7, 1.3);
+      instB.scaling.setAll(bs);
+      addCircle(bx, bz, 0.7 * bs);
+      bushCount++;
     }
-    if (!pointFree(bx, bz, 0.4)) continue;
-    var inst = bushMaster.createInstance('');
-    inst.position.set(bx, 0, bz);
-    inst.rotation.y = rand(0, 6.28);
-    var bs = sr(0.7, 1.3);
-    inst.scaling.setAll(bs);
-    addCircle(bx, bz, 0.7 * bs);
-    bushCount++;
   }
 
   var logParts = [];
   for (var lg = 0; lg < 7; lg++) {
     var lx = sr(-260, 260), lz = sr(-260, 260);
     if (!pointFree(lx, lz, 2)) continue;
-    var log = cyl(0.65, 0.6, sr(3.4, 5), lx, 0.42, lz, '#8a6b4a');
+    var log = cyl(0.65, 0.6, sr(3.4, 5), lx, 0.42, lz, '#92400e');
     log.rotation.z = Math.PI / 2;
     log.rotation.y = sr(0, 6.28);
     logParts.push(log);
@@ -1782,7 +1789,7 @@ function buildScatterMasters() {
   for (var st2 = 0; st2 < 9; st2++) {
     var sx = sr(-260, 260), sz = sr(-260, 260);
     if (!pointFree(sx, sz, 1)) continue;
-    logParts.push(cyl(0.75, 0.85, 0.55, sx, 0.27, sz, '#9c7b52'));
+    logParts.push(cyl(0.75, 0.85, 0.55, sx, 0.27, sz, '#b45309'));
     addCircle(sx, sz, 0.6);
   }
   mergePainted(logParts);
@@ -1794,17 +1801,17 @@ function buildStreetProps() {
     for (var z = -230; z <= 230; z += 46) {
       var side = (z / 46) % 2 === 0 ? 1 : -1;
       var x = c + side * (ROAD_W / 2 + 2.2);
-      poleParts.push(cyl(0.16, 0.2, 5, x, 2.5, z, '#3f4550'));
-      poleParts.push(box(1.1, 0.12, 0.12, x - side * 0.45, 4.95, z, '#3f4550'));
-      bulbParts.push(sph(0.32, x - side * 0.9, 4.85, z, '#ffe9b0'));
+      poleParts.push(cyl(0.16, 0.2, 5, x, 2.5, z, '#1e293b'));
+      poleParts.push(box(1.1, 0.12, 0.12, x - side * 0.45, 4.95, z, '#1e293b'));
+      bulbParts.push(sph(0.32, x - side * 0.9, 4.85, z, '#fef08a'));
       addCircle(x, z, 0.28);
     }
     for (var x2 = -230; x2 <= 230; x2 += 46) {
       var side2 = (x2 / 46) % 2 === 0 ? 1 : -1;
       var z2 = c + side2 * (ROAD_W / 2 + 2.2);
-      poleParts.push(cyl(0.16, 0.2, 5, x2, 2.5, z2, '#3f4550'));
-      poleParts.push(box(0.12, 0.12, 1.1, x2, 4.95, z2 - side2 * 0.45, '#3f4550'));
-      bulbParts.push(sph(0.32, x2, 4.85, z2 - side2 * 0.9, '#ffe9b0'));
+      poleParts.push(cyl(0.16, 0.2, 5, x2, 2.5, z2, '#1e293b'));
+      poleParts.push(box(0.12, 0.12, 1.1, x2, 4.95, z2 - side2 * 0.45, '#1e293b'));
+      bulbParts.push(sph(0.32, x2, 4.85, z2 - side2 * 0.9, '#fef08a'));
       addCircle(x2, z2, 0.28);
     }
   });
@@ -1813,19 +1820,19 @@ function buildStreetProps() {
     var hz = sr(-200, 200);
     var hx = hc + (srnd() > 0.5 ? 1 : -1) * (ROAD_W / 2 + 2.6);
     if (!pointFree(hx, hz, 0.5)) continue;
-    hydParts.push(cyl(0.34, 0.4, 0.75, hx, 0.37, hz, '#c94f3f', null, 10));
-    hydParts.push(sph(0.4, hx, 0.8, hz, '#c94f3f', null, 8));
+    hydParts.push(cyl(0.34, 0.4, 0.75, hx, 0.37, hz, '#ef4444', null, 10));
+    hydParts.push(sph(0.4, hx, 0.8, hz, '#ef4444', null, 8));
     addCircle(hx, hz, 0.35);
   }
   function benchAt(x, z, ry) {
-    var seat = box(1.8, 0.12, 0.55, x, 0.55, z, '#8a6b4a');
+    var seat = box(1.8, 0.12, 0.55, x, 0.55, z, '#f59e0b');
     seat.rotation.y = ry;
     benchParts.push(seat);
-    var bk = box(1.8, 0.5, 0.12, x - Math.sin(ry) * 0.28, 0.85, z - Math.cos(ry) * 0.28, '#8a6b4a');
+    var bk = box(1.8, 0.5, 0.12, x - Math.sin(ry) * 0.28, 0.85, z - Math.cos(ry) * 0.28, '#f59e0b');
     bk.rotation.y = ry;
     benchParts.push(bk);
-    benchParts.push(box(0.14, 0.5, 0.5, x + Math.cos(ry) * 0.7, 0.3, z - Math.sin(ry) * 0.7, '#3f4550'));
-    benchParts.push(box(0.14, 0.5, 0.5, x - Math.cos(ry) * 0.7, 0.3, z + Math.sin(ry) * 0.7, '#3f4550'));
+    benchParts.push(box(0.14, 0.5, 0.5, x + Math.cos(ry) * 0.7, 0.3, z - Math.sin(ry) * 0.7, '#1e293b'));
+    benchParts.push(box(0.14, 0.5, 0.5, x - Math.cos(ry) * 0.7, 0.3, z + Math.sin(ry) * 0.7, '#1e293b'));
     addCircle(x, z, 1);
   }
   for (var bn = 0; bn < 10; bn++) {
@@ -1837,23 +1844,23 @@ function buildStreetProps() {
   for (var dm = 0; dm < 8; dm++) {
     var dcx = sr(-180, 180), dcz = sr(-180, 180);
     if (!pointFree(dcx, dcz, 1.6)) continue;
-    var dump = box(2.4, 1.5, 1.4, dcx, 0.75, dcz, '#3f6b4f');
+    var dump = box(2.4, 1.5, 1.4, dcx, 0.75, dcz, '#10b981');
     dump.rotation.y = sr(0, 6.28);
     dumpParts.push(dump);
     addCircle(dcx, dcz, 1.5);
   }
   [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (tl) {
     var tx = tl[0] * 60.5, tz = tl[1] * 60.5;
-    tlParts.push(cyl(0.18, 0.22, 4.6, tx, 2.3, tz, '#2f343c'));
-    tlParts.push(box(0.5, 1.3, 0.5, tx - tl[0] * 0.4, 4.4, tz - tl[1] * 0.4, '#2f343c'));
-    tlBulbs.push(sph(0.26, tx - tl[0] * 0.4, 4.75, tz - tl[1] * 0.4, '#ff5a4a'));
+    tlParts.push(cyl(0.18, 0.22, 4.6, tx, 2.3, tz, '#0f172a'));
+    tlParts.push(box(0.5, 1.3, 0.5, tx - tl[0] * 0.4, 4.4, tz - tl[1] * 0.4, '#0f172a'));
+    tlBulbs.push(sph(0.26, tx - tl[0] * 0.4, 4.75, tz - tl[1] * 0.4, '#ef4444'));
     addCircle(tx, tz, 0.3);
   });
   mergePainted(poleParts);
   var bulbMesh = mergePainted(bulbParts);
   if (bulbMesh) {
     var bm = new BABYLON.StandardMaterial('bulb', scene);
-    bm.emissiveColor = new BABYLON.Color3(0.95, 0.85, 0.55);
+    bm.emissiveColor = new BABYLON.Color3(0.98, 0.90, 0.60);
     bm.diffuseColor = new BABYLON.Color3(0.4, 0.35, 0.2);
     bm.specularColor = BABYLON.Color3.Black();
     ALL_MATS.push(bm);
@@ -1864,17 +1871,17 @@ function buildStreetProps() {
   mergePainted(dumpParts);
   mergePainted(tlParts);
   var lb = mergePainted(tlBulbs);
-  if (lb) lb.material = mat('#ff5a4a', { e: '#8a1f14' });
+  if (lb) lb.material = mat('#ef4444', { e: '#ef4444' });
 
   [[-95, 152.2], [95, -152.2], [152.2, -40], [-152.2, 40]].forEach(function (bs) {
     var horiz = Math.abs(bs[1]) > 150;
     var px = bs[0], pz = bs[1];
     var ax = horiz ? 1 : 0, az = horiz ? 0 : 1;
     var stopParts = [];
-    stopParts.push(cyl(0.14, 0.16, 3, px - ax * 2, 1.5, pz - az * 2, '#4f5a66'));
-    stopParts.push(cyl(0.14, 0.16, 3, px + ax * 2, 1.5, pz + az * 2, '#4f5a66'));
-    stopParts.push(horiz ? box(5.4, 0.18, 2.6, px, 3.05, pz, '#5f8f9f') : box(2.6, 0.18, 5.4, px, 3.05, pz, '#5f8f9f'));
-    stopParts.push(horiz ? box(2, 1.2, 1.4, px + 2.2, 1.6, pz, '#c9a03f') : box(1.4, 1.2, 2, px, 1.6, pz + 2.2, '#c9a03f'));
+    stopParts.push(cyl(0.14, 0.16, 3, px - ax * 2, 1.5, pz - az * 2, '#1e293b'));
+    stopParts.push(cyl(0.14, 0.16, 3, px + ax * 2, 1.5, pz + az * 2, '#1e293b'));
+    stopParts.push(horiz ? box(5.4, 0.18, 2.6, px, 3.05, pz, '#38bdf8') : box(2.6, 0.18, 5.4, px, 3.05, pz, '#38bdf8'));
+    stopParts.push(horiz ? box(2, 1.2, 1.4, px + 2.2, 1.6, pz, '#f59e0b') : box(1.4, 1.2, 2, px, 1.6, pz + 2.2, '#f59e0b'));
     var bsm = mergePainted(stopParts);
     if (bsm) OCCLUDERS.push(bsm);
     addCircle(px - ax * 2, pz - az * 2, 0.25);
@@ -2067,70 +2074,80 @@ function buildSky() {
     skyMat = new BABYLON.StandardMaterial('skyMat', scene);
     skyMat.diffuseColor = BABYLON.Color3.Black();
     skyMat.specularColor = BABYLON.Color3.Black();
-    skyMat.emissiveColor = scene.fogColor.clone();
+    skyMat.emissiveColor = scene.clearColor.toColor3 ? scene.clearColor.toColor3() : new BABYLON.Color3(scene.clearColor.r, scene.clearColor.g, scene.clearColor.b);
     skyMat.disableLighting = true;
     skyMat.backFaceCulling = false;
     skyDome.material = skyMat;
     skyDome.isPickable = false;
     skyDome.infiniteDistance = true;
+    // Exclude sky dome from glow layer to prevent bloom/glow
+    if (typeof glowLayer !== 'undefined' && glowLayer && glowLayer.addExcludedMesh) {
+      glowLayer.addExcludedMesh(skyDome);
+    }
     UNFROZEN_MATS.push(skyMat);
   } catch (e) {
     skyDome = null;
     skyMat = null;
   }
-  for (var i = 0; i < 8; i++) {
+  for (var i = 0; i < 12; i++) {
     var parts = [];
-    var n = 3 + Math.floor(srnd() * 2);
+    var n = 4 + Math.floor(srnd() * 3);
     for (var s = 0; s < n; s++) {
-      var cl = BABYLON.MeshBuilder.CreateSphere('', { diameter: sr(9, 16), segments: 8 }, scene);
-      cl.position.set(sr(-8, 8), sr(-1, 1), sr(-3, 3));
-      cl.scaling.y = 0.5;
+      var cl = BABYLON.MeshBuilder.CreateSphere('', { diameter: sr(10, 20), segments: 8 }, scene);
+      cl.position.set(sr(-10, 10), sr(-1.5, 1.5), sr(-4, 4));
+      cl.scaling.y = 0.45;
       paint(cl, '#ffffff');
       parts.push(cl);
     }
     var m = mergePainted(parts);
     if (!m) continue;
     var cm = new BABYLON.StandardMaterial('cl' + i, scene);
-    cm.diffuseColor = new BABYLON.Color3(1, 1, 1);
-    cm.emissiveColor = new BABYLON.Color3(0.22, 0.22, 0.24);
+    cm.diffuseColor = new BABYLON.Color3(0.98, 0.98, 1.0);
+    cm.emissiveColor = BABYLON.Color3.Black();
     cm.specularColor = BABYLON.Color3.Black();
     ALL_MATS.push(cm);
     m.material = cm;
-    m.position.set(sr(-330, 330), sr(62, 96), sr(-330, 330));
-    clouds.push({ m: m, v: sr(0.6, 1.6) });
+    m.position.set(sr(-340, 340), sr(55, 90), sr(-340, 340));
+    // Exclude clouds from glow layer to prevent unwanted bloom
+    if (typeof glowLayer !== 'undefined' && glowLayer && glowLayer.addExcludedMesh) {
+      glowLayer.addExcludedMesh(m);
+    }
+    clouds.push({ m: m, v: sr(0.8, 2.0) });
   }
+  var mtnCols = ['#22c55e', '#16a34a', '#15803d', '#059669'];
   for (var mo = 0; mo < 12; mo++) {
     var ma = (mo / 12) * Math.PI * 2 + sr(-0.12, 0.12);
     var mr = sr(365, 430);
     var mx = Math.cos(ma) * mr, mz = Math.sin(ma) * mr;
     var mh = sr(60, 135);
     var mbase = sr(70, 130);
-    var cone = cyl(mbase, 0, mh, mx, mh / 2 - 4, mz, '#7fa08f', null, 7);
+    var cone = cyl(mbase, 0, mh, mx, mh / 2 - 4, mz, mtnCols[mo % mtnCols.length], null, 7);
     cone.rotation.y = sr(0, 6.28);
-    var snow = cyl(mbase * 0.3, 0, mh * 0.24, mx, mh - mh * 0.1, mz, '#f2f6f8', null, 7);
+    var snow = cyl(mbase * 0.3, 0, mh * 0.24, mx, mh - mh * 0.1, mz, '#ffffff', null, 7);
     snow.rotation.y = cone.rotation.y;
     mergePainted([cone, snow]);
   }
 }
 
 function buildBloodDecals() {
-  var bloodParts = [];
-  var bloodColors = ['#4a0606', '#660b0b', '#3b0404', '#7a1010'];
-  for (var i = 0; i < 46; i++) {
+  // Cartoon green slime/goo splats instead of realistic blood
+  var splatParts = [];
+  var splatColors = ['#22c55e', '#4ade80', '#a3e635', '#84cc16'];
+  for (var i = 0; i < 30; i++) {
     var bx = sr(-260, 260), bz = sr(-260, 260);
     if (nearRoad(bx, bz) || Math.hypot(bx, bz) < 22) {
-      var rad = sr(0.7, 1.8);
-      var col = bloodColors[Math.floor(srnd() * bloodColors.length)];
+      var rad = sr(0.5, 1.4);
+      var col = splatColors[Math.floor(srnd() * splatColors.length)];
       var bDisc = discR(rad, bx, bz, 0.025, col, 10);
-      bloodParts.push(bDisc);
-      for (var d = 0; d < 3; d++) {
-        var dx = bx + sr(-rad * 1.4, rad * 1.4);
-        var dz = bz + sr(-rad * 1.4, rad * 1.4);
-        bloodParts.push(discR(sr(0.12, 0.32), dx, dz, 0.028, col, 6));
+      splatParts.push(bDisc);
+      for (var d = 0; d < 2; d++) {
+        var dx = bx + sr(-rad * 1.2, rad * 1.2);
+        var dz = bz + sr(-rad * 1.2, rad * 1.2);
+        splatParts.push(discR(sr(0.1, 0.25), dx, dz, 0.028, col, 6));
       }
     }
   }
-  mergePainted(bloodParts);
+  mergePainted(splatParts);
 }
 
 function buildWorld() {

@@ -19,6 +19,7 @@ var MODEL_LOADER = (function () {
   function normalizeMesh(rootMesh, targetHeight) {
     if (!rootMesh) return;
     try {
+      if (rootMesh.computeWorldMatrix) rootMesh.computeWorldMatrix(true);
       var hierarchy = rootMesh.getChildMeshes(false);
       if (hierarchy.length === 0) hierarchy = [rootMesh];
 
@@ -27,17 +28,22 @@ var MODEL_LOADER = (function () {
 
       for (var i = 0; i < hierarchy.length; i++) {
         var m = hierarchy[i];
+        if (m.computeWorldMatrix) m.computeWorldMatrix(true);
         if (m.getTotalVertices && m.getTotalVertices() > 0) {
           var bi = m.getBoundingInfo();
-          min = BABYLON.Vector3.Minimize(min, bi.boundingBox.minimumWorld);
-          max = BABYLON.Vector3.Maximize(max, bi.boundingBox.maximumWorld);
+          if (bi && bi.boundingBox) {
+            min = BABYLON.Vector3.Minimize(min, bi.boundingBox.minimumWorld);
+            max = BABYLON.Vector3.Maximize(max, bi.boundingBox.maximumWorld);
+          }
         }
       }
 
       var currentHeight = max.y - min.y;
-      if (currentHeight > 0.001 && targetHeight) {
+      if (isFinite(currentHeight) && currentHeight > 0.001 && targetHeight && isFinite(targetHeight)) {
         var scaleFactor = targetHeight / currentHeight;
-        rootMesh.scaling.scaleInPlace(scaleFactor);
+        if (isFinite(scaleFactor) && scaleFactor > 0) {
+          rootMesh.scaling.scaleInPlace(scaleFactor);
+        }
       }
     } catch (e) {
       console.warn('Model normalization note:', e.message);

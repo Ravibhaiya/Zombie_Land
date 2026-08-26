@@ -16,9 +16,9 @@ var CONFIG = {
     ROADS: [-150, -50, 50, 150],
     SAFE_RADIUS: 11,
     SAFE_HOUSE_GRID: [-190, -100, 0, 100, 190],
-    CLEAR_COLOR: [0.03, 0.06, 0.05, 1], // Pitch midnight horror sky
-    FOG_COLOR: [0.04, 0.08, 0.06],      // Deep ominous green-black mist
-    FOG_DENSITY: 0.0038
+    CLEAR_COLOR: [0.98, 0.85, 0.72, 1], // Warm cartoon morning sunrise sky
+    FOG_COLOR: [0.95, 0.82, 0.70],      // Soft golden morning haze
+    FOG_DENSITY: 0.0014
   },
 
   // Dynamic Day / Night Cycle Engine
@@ -248,18 +248,18 @@ var CONFIG = {
     SHADOW_MAP_SIZE_MOBILE: 512,
     SHADOW_BLUR_KERNEL: 12,
     GLOW_TEXTURE_RATIO: 0.25,
-    GLOW_INTENSITY: 0.7,
-    GLOW_INTENSITY_MOBILE: 0.45,
+    GLOW_INTENSITY: 0.35,
+    GLOW_INTENSITY_MOBILE: 0.25,
     FPS_LOW_THRESHOLD_DESKTOP: 28,
     FPS_HIGH_THRESHOLD_DESKTOP: 50,
     FPS_LOW_THRESHOLD_MOBILE: 24,
     FPS_HIGH_THRESHOLD_MOBILE: 52,
     MAX_DPR_DESKTOP: 2,
     MAX_DPR_MOBILE: 1.5,
-    CONTRAST: 1.14,
-    EXPOSURE: 1.06,
-    VIGNETTE_WEIGHT: 1.28,
-    BLOOM_WEIGHT: 0.16
+    CONTRAST: 1.08,
+    EXPOSURE: 1.04,
+    VIGNETTE_WEIGHT: 0.6,
+    BLOOM_WEIGHT: 0.08
   },
 
   // Audio Engine
